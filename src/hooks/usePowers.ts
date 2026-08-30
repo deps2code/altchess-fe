@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { getPowers, type Power } from "../api/client";
+import { api, type Power } from "../api/client";
 
 type PowersState =
   | { status: "loading"; powers: Power[]; error: null }
@@ -12,7 +12,8 @@ export function usePowers(): PowersState {
   useEffect(() => {
     const controller = new AbortController();
 
-    getPowers(controller.signal)
+    api
+      .powers(controller.signal)
       .then((powers) => setState({ status: "ready", powers, error: null }))
       .catch((error: unknown) => {
         if (!controller.signal.aborted) {
@@ -26,4 +27,3 @@ export function usePowers(): PowersState {
 
   return state;
 }
-

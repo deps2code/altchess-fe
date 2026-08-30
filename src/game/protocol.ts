@@ -20,6 +20,10 @@ export type StateFrame = {
   clocks: ClockFrame;
   result?: "white" | "black" | "draw";
   end_reason?: string;
+  /** Only set on the terminal frame for a decisive/drawn game — never for
+   *  an abort, which isn't rated. */
+  white_rating_change?: number;
+  black_rating_change?: number;
 };
 
 export type ErrorFrame = {

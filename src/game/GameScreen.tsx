@@ -17,7 +17,26 @@ type LiveState = {
   clocks: ClockFrame;
   result?: "white" | "black" | "draw";
   endReason?: string;
+  whiteRatingChange?: number;
+  blackRatingChange?: number;
 };
+
+const endReasonLabels: Record<string, string> = {
+  checkmate: "Checkmate",
+  stalemate: "Stalemate",
+  draw: "Draw",
+  resignation: "Resignation",
+  timeout: "Time forfeit",
+};
+
+/** A signed rating delta plus the rating it lands on, e.g. "1523 (+8)". */
+function ratingCell(baseRating: number, change: number | undefined): string {
+  if (change === undefined) {
+    return `${baseRating}`;
+  }
+  const sign = change > 0 ? "+" : "";
+  return `${baseRating + change} (${sign}${change})`;
+}
 
 function formatClock(ms: number): string {
   const totalSeconds = Math.max(0, Math.round(ms / 1000));
@@ -27,14 +46,7 @@ function formatClock(ms: number): string {
 }
 
 function describeEnd(viewerColor: "white" | "black", live: LiveState): string {
-  const reason: Record<string, string> = {
-    checkmate: "Checkmate",
-    stalemate: "Stalemate",
-    draw: "Draw",
-    resignation: "Resignation",
-    timeout: "Time forfeit",
-  };
-  const label = reason[live.endReason ?? ""] ?? "Game over";
+  const label = endReasonLabels[live.endReason ?? ""] ?? "Game over";
   if (!live.result || live.result === "draw") {
     return `${label} — draw.`;
   }
@@ -108,6 +120,8 @@ export function GameScreen({
           clocks,
           result: snapshot.result,
           endReason: snapshot.end_reason,
+          whiteRatingChange: snapshot.white_rating_change,
+          blackRatingChange: snapshot.black_rating_change,
         });
         setDisplayClocks(clocks);
         setClocksAt(Date.now());
@@ -131,6 +145,8 @@ export function GameScreen({
                 clocks: frame.clocks,
                 result: frame.result,
                 endReason: frame.end_reason,
+                whiteRatingChange: frame.white_rating_change,
+                blackRatingChange: frame.black_rating_change,
               });
               setDisplayClocks(frame.clocks);
               setClocksAt(Date.now());
@@ -272,6 +288,44 @@ export function GameScreen({
           )}
         </aside>
       </div>
+
+      {finished && live && (
+        <div className="modal-backdrop">
+          <div className="modal" role="dialog" aria-modal="true" aria-labelledby="result-heading">
+            <span className="result-icon" aria-hidden="true">
+              ♚
+            </span>
+            {live.status === "aborted" ? (
+              <h3 id="result-heading">Game aborted</h3>
+            ) : (
+              <>
+                <h3 id="result-heading">
+                  {!live.result || live.result === "draw"
+                    ? "Draw"
+                    : `${(live.result === "white" ? game.white : game.black).display_name} wins`}
+                </h3>
+                <p className="hint">
+                  {live.result && live.result !== "draw" && `${live.result === "white" ? "White" : "Black"} · `}
+                  {endReasonLabels[live.endReason ?? ""] ?? "Game over"}
+                </p>
+                <dl>
+                  <div>
+                    <dt>{game.white.display_name} · White</dt>
+                    <dd>{ratingCell(game.white.rating, live.whiteRatingChange)}</dd>
+                  </div>
+                  <div>
+                    <dt>{game.black.display_name} · Black</dt>
+                    <dd>{ratingCell(game.black.rating, live.blackRatingChange)}</dd>
+                  </div>
+                </dl>
+              </>
+            )}
+            <button type="button" className="pill" onClick={onGameEnded}>
+              Back to lobby
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

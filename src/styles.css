@@ -86,6 +86,9 @@ h2 { margin: .75rem 0; font-family: Georgia, serif; font-size: clamp(2rem, 4vw, 
 .switch button { display: inline; margin: 0; padding: 0; border: 0; color: #d6a94b; background: none; font-weight: 700; text-decoration: underline; text-underline-offset: 2px; }
 .switch button:hover { background: none; color: #ebc46f; }
 
+button.link { display: inline; margin: 1rem 0 0; padding: 0; border: 0; color: #d6a94b; background: none; font-size: .85rem; font-weight: 700; text-decoration: underline; text-underline-offset: 2px; }
+button.link:hover { background: none; color: #ebc46f; }
+
 form label, legend { display: block; margin-bottom: .5rem; color: #8e8a7f; font-size: .7rem; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; }
 form label:not(:first-of-type) { margin-top: 1.25rem; }
 input, select { width: 100%; padding: .8rem .9rem; border: 1px solid #ffffff26; color: #ece8dd; background: #171611; font: inherit; }
@@ -124,6 +127,20 @@ dd { margin: .4rem 0 0; font-family: Georgia, serif; font-size: 1.75rem; }
 .modal .hint { margin: .85rem 0 1.75rem; }
 .modal button.ghost { margin: 0; }
 .spinner-pawn { display: inline-block; font-size: 3rem; line-height: 1; color: #d6a94b; }
+.result-icon { display: inline-block; font-size: 3rem; line-height: 1; color: #d6a94b; }
+
+.games-modal { width: min(32rem, 100%); text-align: left; }
+.games-modal h3 { text-align: center; }
+.game-history { list-style: none; margin: 1.5rem 0 0; padding: 0; display: flex; flex-direction: column; gap: .75rem; max-height: 20rem; overflow-y: auto; }
+.game-history li { display: flex; flex-direction: column; gap: .35rem; padding: .85rem; border: 1px solid #ffffff20; }
+.game-history-opponent { font-weight: 600; }
+.game-history-meta { color: #8e8a7f; font-size: .8rem; }
+.result-badge { display: inline-block; width: fit-content; padding: .15rem .6rem; border-radius: 999px; font-size: .65rem; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
+.result-win { background: #7fa56b33; color: #9fc98a; }
+.result-loss { background: #e99c8533; color: #e99c85; }
+.result-draw, .result-aborted { background: #8e8a7f33; color: #b9b4a7; }
+.pagination { display: flex; align-items: center; justify-content: space-between; margin: 1.5rem 0 0; color: #8e8a7f; font-size: .85rem; }
+.games-modal button.ghost { margin: 0; }
 
 /* Game screen: a full-screen takeover, distinct from the lobby, like a match
    room rather than a page section. */

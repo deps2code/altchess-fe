@@ -4,8 +4,7 @@ import { useAuth } from "../auth/AuthProvider";
 import { formatTimeControl } from "../lobby/format";
 import { GameScreen, type PlayableGame } from "./GameScreen";
 
-/** Mirrors useSeek's POLL_INTERVAL_MS — how often a waiting room checks
- *  whether someone has joined yet. */
+/** How often a waiting room checks whether someone has joined yet. */
 const POLL_INTERVAL_MS = 2000;
 
 /** Renders whatever a `/?game={id}` link currently points at: a waiting

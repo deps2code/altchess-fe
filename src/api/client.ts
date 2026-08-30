@@ -25,6 +25,25 @@ export type PublicUser = {
   rating: number;
 };
 
+/** One row of a user's game history, from that user's own perspective. */
+export type GameSummary = {
+  id: string;
+  opponent: PublicUser;
+  played_white: boolean;
+  result: "win" | "loss" | "draw" | "aborted";
+  end_reason?: string;
+  rating_change?: number;
+  initial_seconds: number;
+  increment_seconds: number;
+  ended_at: string;
+};
+
+export type RecentGamesPage = {
+  games: GameSummary[];
+  page: number;
+  has_more: boolean;
+};
+
 export type Tokens = {
   access_token: string;
   refresh_token: string;
@@ -98,6 +117,9 @@ export type GameSnapshot = {
   result?: "white" | "black" | "draw";
   end_reason?: string;
   pgn?: string;
+  /** Only set for a decisive/drawn finished game — never for an abort. */
+  white_rating_change?: number;
+  black_rating_change?: number;
 };
 
 /** ApiError carries the server's machine-readable code so callers can branch on
@@ -189,6 +211,9 @@ export const api = {
     request<void>("/api/v1/auth/logout", { method: "POST", body: { refresh_token: refreshToken } }),
 
   me: (token: string, signal?: AbortSignal) => request<User>("/api/v1/me", { token, signal }),
+
+  recentGames: (token: string, page: number, signal?: AbortSignal) =>
+    request<RecentGamesPage>(`/api/v1/me/games?page=${page}`, { token, signal }),
 
   createSeek: (token: string, seek: SeekRequest) =>
     request<SeekResult>("/api/v1/seeks", { method: "POST", token, body: seek }),

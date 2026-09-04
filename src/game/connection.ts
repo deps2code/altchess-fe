@@ -22,8 +22,11 @@ export function openGameConnection(
   let reconnectTimer: number | undefined;
 
   function wsURL(token: string): string {
-    const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-    return `${protocol}//${window.location.host}/api/v1/games/${encodeURIComponent(gameID)}/ws?token=${encodeURIComponent(token)}`;
+    const base = import.meta.env.VITE_API_BASE;
+    const origin = base
+      ? base.replace(/^http/, "ws") // https:// -> wss://
+      : `${window.location.protocol === "https:" ? "wss:" : "ws:"}//${window.location.host}`;
+    return `${origin}/api/v1/games/${encodeURIComponent(gameID)}/ws?token=${encodeURIComponent(token)}`;
   }
 
   function scheduleReconnect() {

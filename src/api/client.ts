@@ -58,6 +58,7 @@ export type Registration = {
   email: string;
   password: string;
   display_name?: string;
+  invite_code?: string;
 };
 
 export type Seek = {
@@ -142,6 +143,10 @@ export class ApiError extends Error {
   }
 }
 
+// Empty in dev, where vite.config.ts proxies /api to :8080. Set at build time
+// on Cloudflare Pages, where the API is a different origin.
+const API_BASE = import.meta.env.VITE_API_BASE ?? "";
+
 type RequestOptions = {
   method?: string;
   body?: unknown;
@@ -162,7 +167,7 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
 
   let response: Response;
   try {
-    response = await fetch(path, {
+    response = await fetch(API_BASE + path, {
       method,
       headers,
       signal,

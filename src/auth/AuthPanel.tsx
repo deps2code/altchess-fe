@@ -11,6 +11,7 @@ export function AuthPanel() {
   const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [inviteCode, setInviteCode] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -28,7 +29,7 @@ export function AuthPanel() {
 
     try {
       if (signingUp) {
-        await signUp({ username, email, password });
+        await signUp({ username, email, password, invite_code: inviteCode });
       } else {
         await signIn(login, password);
       }
@@ -67,6 +68,14 @@ export function AuthPanel() {
               onChange={(event) => setEmail(event.target.value)}
               autoComplete="email"
               required
+            />
+
+            <label htmlFor="invite-code">Invite code</label>
+            <input
+              id="invite-code"
+              value={inviteCode}
+              onChange={(event) => setInviteCode(event.target.value)}
+              autoComplete="off"
             />
           </>
         ) : (

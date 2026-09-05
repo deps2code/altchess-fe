@@ -4,14 +4,14 @@ import { useAuth } from "./AuthProvider";
 
 type Mode = "sign-in" | "sign-up";
 
-export function AuthPanel() {
+export function AuthPanel({ initialInviteCode }: { initialInviteCode?: string | null }) {
   const { signIn, signUp } = useAuth();
-  const [mode, setMode] = useState<Mode>("sign-in");
+  const [mode, setMode] = useState<Mode>(initialInviteCode ? "sign-up" : "sign-in");
   const [login, setLogin] = useState("");
   const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [inviteCode, setInviteCode] = useState("");
+  const [inviteCode, setInviteCode] = useState(initialInviteCode ?? "");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 

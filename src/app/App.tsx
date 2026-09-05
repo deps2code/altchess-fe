@@ -17,6 +17,12 @@ export function App() {
     () => new URLSearchParams(window.location.search).get("game"),
   );
 
+  // `?invite={code}` prefills the sign-up form's invite code, for sharing a
+  // registration invite as a link instead of dictating the code by hand.
+  const [inviteCode] = useState<string | null>(
+    () => new URLSearchParams(window.location.search).get("invite"),
+  );
+
   function goToGame(id: string) {
     window.history.pushState({}, "", `/?game=${encodeURIComponent(id)}`);
     setGameLinkID(id);
@@ -69,7 +75,7 @@ export function App() {
               </p>
             </div>
             <div className="glass-card">
-              <AuthPanel />
+              <AuthPanel initialInviteCode={inviteCode} />
             </div>
           </section>
         </div>

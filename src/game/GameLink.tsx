@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import { ApiError, api, type Game, type GameSnapshot } from "../api/client";
 import { useAuth } from "../auth/AuthProvider";
-import { formatTimeControl } from "../lobby/format";
+import { formatPowers, formatTimeControl } from "../lobby/format";
+import { CheckIcon, CloseIcon, CopyIcon } from "./icons";
 import { GameScreen, type PlayableGame } from "./GameScreen";
 
 /** How often a waiting room checks whether someone has joined yet. */
@@ -115,7 +116,15 @@ export function GameLink({
         />
       );
     }
-    return <JoinPrompt game={game} busy={joinBusy} error={joinError} onJoin={() => void join()} />;
+    return (
+      <JoinPrompt
+        game={game}
+        busy={joinBusy}
+        error={joinError}
+        onJoin={() => void join()}
+        onLeaveToLobby={onLeaveToLobby}
+      />
+    );
   }
 
   const isParticipant = game.white.id === viewerID || game.black?.id === viewerID;
@@ -182,24 +191,46 @@ function WaitingRoom({
           Waiting for an opponent<span className="dots" aria-hidden="true" />
         </h3>
         <p className="hint">
-          {formatTimeControl(game.initial_seconds, game.increment_seconds)} · share this link — the first person
-          who opens it while signed in joins as your opponent.
+          {formatTimeControl(game.initial_seconds, game.increment_seconds)} ·{" "}
+          {formatPowers(game.powers_per_player)} · share this link — the first person who opens it while signed
+          in joins as your opponent.
         </p>
         <label htmlFor="invite-link" className="hint">
           Invite link
         </label>
         <input id="invite-link" type="text" readOnly value={link} onFocus={(event) => event.target.select()} />
-        <button type="button" className="pill outline" onClick={() => void copyLink()}>
-          {copied ? "Copied" : "Copy link"}
-        </button>
+        {/* Icon-only, side by side: copying the link and abandoning the
+            invite are the only two things this screen can do, and the
+            accessible name lives on the button rather than in visible text. */}
+        <div className="modal-actions">
+          <button
+            type="button"
+            className="icon-button primary"
+            title={copied ? "Copied" : "Copy link"}
+            aria-label={copied ? "Invite link copied" : "Copy invite link"}
+            onClick={() => void copyLink()}
+          >
+            {copied ? <CheckIcon /> : <CopyIcon />}
+          </button>
+          <button
+            type="button"
+            className="icon-button danger"
+            title="Cancel invite"
+            aria-label="Cancel invite"
+            onClick={onCancel}
+            disabled={busy}
+          >
+            <CloseIcon />
+          </button>
+        </div>
+        <p className="hint action-caption" role="status">
+          {busy ? "Cancelling…" : copied ? "Link copied" : "Copy the link · cancel the invite"}
+        </p>
         {error && (
           <p className="error" role="alert">
             {error}
           </p>
         )}
-        <button type="button" className="ghost" onClick={onCancel} disabled={busy}>
-          {busy ? "Cancelling…" : "Cancel invite"}
-        </button>
       </div>
     </div>
   );
@@ -210,11 +241,13 @@ function JoinPrompt({
   busy,
   error,
   onJoin,
+  onLeaveToLobby,
 }: {
   game: Game;
   busy: boolean;
   error: string | null;
   onJoin: () => void;
+  onLeaveToLobby: () => void;
 }) {
   return (
     <div className="modal-backdrop">
@@ -223,9 +256,11 @@ function JoinPrompt({
           ♟
         </span>
         <h3 id="join-heading">{game.white.display_name} invited you to play</h3>
+        {/* The power budget is fixed by the creator, so this is what the
+            joiner is agreeing to — shown before they accept, not after. */}
         <p className="hint">
-          {formatTimeControl(game.initial_seconds, game.increment_seconds)} · @{game.white.username} ·{" "}
-          {game.white.rating}
+          {formatTimeControl(game.initial_seconds, game.increment_seconds)} ·{" "}
+          {formatPowers(game.powers_per_player)} · @{game.white.username} · {game.white.rating}
         </p>
         {error && (
           <p className="error" role="alert">
@@ -235,6 +270,13 @@ function JoinPrompt({
         <button type="button" className="pill" onClick={onJoin} disabled={busy}>
           {busy ? "Joining…" : "Join game"}
         </button>
+        {/* A refused join is usually "you are already in a game"; the lobby is
+            where the way back into that one is. */}
+        {error && (
+          <button type="button" className="ghost" onClick={onLeaveToLobby}>
+            Back to lobby
+          </button>
+        )}
       </div>
     </div>
   );

@@ -1,7 +1,21 @@
-import type { ClientMessage, ErrorFrame, ServerFrame, StateFrame } from "./protocol";
+import type {
+  ClientMessage,
+  ErrorFrame,
+  PowerNoticeFrame,
+  PowerUsedFrame,
+  ServerFrame,
+  StateFrame,
+} from "./protocol";
 
 const RECONNECT_BASE_MS = 500;
 const RECONNECT_MAX_MS = 8_000;
+
+/** Close code the server sends to a connection the same player displaced by
+ *  opening this game somewhere else — one game runs in one session at a time.
+ *  Mirrors game.StatusSessionReplaced in backend/internal/game/hub.go, and is
+ *  in the application-private 4000-4999 range precisely so it can be told
+ *  apart from an ordinary drop. */
+const SESSION_REPLACED_CODE = 4001;
 
 export type GameConnection = {
   send: (message: ClientMessage) => void;
@@ -10,11 +24,19 @@ export type GameConnection = {
 
 /** Opens a live connection to one game and keeps it open, reconnecting with
  *  capped backoff on any drop. getToken is called on every (re)connect
- *  attempt since the access token is short-lived and may have rotated. */
+ *  attempt since the access token is short-lived and may have rotated.
+ *  onSessionReplaced fires at most once, and the connection is finished when
+ *  it does — call openGameConnection again to take the game back. */
 export function openGameConnection(
   gameID: string,
   getToken: () => Promise<string>,
-  handlers: { onState: (frame: StateFrame) => void; onError: (frame: ErrorFrame) => void },
+  handlers: {
+    onState: (frame: StateFrame) => void;
+    onError: (frame: ErrorFrame) => void;
+    onPowerUsed?: (frame: PowerUsedFrame) => void;
+    onPowerNotice?: (frame: PowerNoticeFrame) => void;
+    onSessionReplaced?: () => void;
+  },
 ): GameConnection {
   let closed = false;
   let socket: WebSocket | null = null;
@@ -72,12 +94,24 @@ export function openGameConnection(
         handlers.onState(frame);
       } else if (frame.type === "error") {
         handlers.onError(frame);
+      } else if (frame.type === "power_used") {
+        handlers.onPowerUsed?.(frame);
+      } else if (frame.type === "power_notice") {
+        handlers.onPowerNotice?.(frame);
       }
     };
 
-    ws.onclose = () => {
+    ws.onclose = (event) => {
       if (socket === ws) {
         socket = null;
+      }
+      if (event.code === SESSION_REPLACED_CODE) {
+        // Reconnecting would displace the session that just took over, which
+        // would displace this one straight back — two devices evicting each
+        // other forever. Stay closed and let the UI offer the choice.
+        closed = true;
+        handlers.onSessionReplaced?.();
+        return;
       }
       scheduleReconnect();
     };

@@ -39,6 +39,10 @@ export type BoardStateUpdate = {
 
 export type BoardHandle = {
   applyState: (update: BoardStateUpdate) => void;
+  /** Draws the arrow for a `best_move` answer, or clears it with null. The
+   *  hint is private to this viewer — it is drawn from a frame only they
+   *  received — and is cleared by the next authoritative state. */
+  showHint: (uci: string | null) => void;
   destroy: () => void;
 };
 
@@ -53,6 +57,11 @@ export function mountGameBoard(
   initial: BoardStateUpdate,
   onMove: (uci: string, expectedPly: number) => void,
 ): BoardHandle {
+  // chessground's destroy() unbinds its handlers but leaves its markup in
+  // place, so a remount into the same node (taking a displaced session back)
+  // would stack a second board on top of the first.
+  el.replaceChildren();
+
   let ply = initial.ply;
   let chess = chessFromFen(initial.fen);
 
@@ -80,11 +89,19 @@ export function mountGameBoard(
     movable: movable(initial.status),
   });
 
+  function showHint(uci: string | null) {
+    const keys = moveKeys(uci ?? undefined);
+    api.setAutoShapes(keys ? [{ orig: keys[0], dest: keys[1], brush: "green" }] : []);
+  }
+
   return {
     applyState(update) {
       ply = update.ply;
       chess = chessFromFen(update.fen);
       const live = update.status === "pending" || update.status === "live";
+      // The position moved on, so any hint drawn for the previous one is
+      // stale by definition.
+      showHint(null);
       api.set({
         fen: update.fen,
         turnColor: update.turn,
@@ -94,6 +111,7 @@ export function mountGameBoard(
         movable: movable(update.status),
       });
     },
+    showHint,
     destroy() {
       api.destroy();
     },

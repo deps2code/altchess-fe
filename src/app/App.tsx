@@ -89,7 +89,7 @@ export function App() {
           ) : gameLinkID ? (
             <GameLink gameID={gameLinkID} viewerID={state.user.id} onLeaveToLobby={goToLobby} />
           ) : (
-            <Lobby user={state.user} onCreateInvite={goToGame} />
+            <Lobby user={state.user} onOpenGame={goToGame} />
           )}
         </>
       )}
@@ -103,6 +103,9 @@ export function App() {
         <div className="power-list" aria-live="polite">
           {powers.status === "loading" && <p>Loading available powers…</p>}
           {powers.status === "error" && <p className="error">{powers.error}. Start the backend and try again.</p>}
+          {powers.status === "ready" && !powers.available && (
+            <p className="hint">This server has no engine configured, so powers can't be used in a game yet.</p>
+          )}
           {powers.powers.map((power, index) => (
             <article key={power.id}>
               <span className="power-index">0{index + 1}</span>

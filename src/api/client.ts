@@ -1,8 +1,18 @@
+export type PowerID = "best_move" | "current_eval";
+
 export type Power = {
-  id: "best_move" | "current_eval";
+  id: PowerID;
   name: string;
   description: string;
   visibility: "private";
+};
+
+/** `available` is whether this deployment has an engine behind the catalog —
+ *  STOCKFISH_PATH is optional on the server, so powers can exist as a concept
+ *  while being unspendable here. */
+export type PowerCatalog = {
+  powers: Power[];
+  available: boolean;
 };
 
 export type User = {
@@ -80,6 +90,9 @@ export type Game = {
   increment_seconds: number;
   status: string;
   created_at: string;
+  /** Charges of *each* power both players get in this game, fixed when the
+   *  invite was created. 0 is plain chess. */
+  powers_per_player: number;
 };
 
 export type SeekRequest = {
@@ -91,6 +104,7 @@ export type SeekRequest = {
 export type InviteRequest = {
   initial_seconds: number;
   increment_seconds: number;
+  powers_per_player: number;
 };
 
 export type SeekResult = {
@@ -121,6 +135,18 @@ export type GameSnapshot = {
   /** Only set for a decisive/drawn finished game — never for an abort. */
   white_rating_change?: number;
   black_rating_change?: number;
+  /** The caller's *own* remaining charges, never the opponent's — budgets are
+   *  private, and the server narrows this to the requesting player's color.
+   *  Absent for a finished game (the live budget went with its Redis key) and
+   *  for a waiting invite. */
+  powers?: {
+    per_player: number;
+    remaining: Record<PowerID, number>;
+    /** Whether the caller has already spent their one power for the current
+     *  ply — one power per turn, whichever power it is. Rehydrates the
+     *  disabled state after a reload; the server enforces it regardless. */
+    used_this_turn: boolean;
+  };
 };
 
 /** ApiError carries the server's machine-readable code so callers can branch on
@@ -200,8 +226,7 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
 }
 
 export const api = {
-  powers: (signal?: AbortSignal) =>
-    request<{ powers: Power[] }>("/api/v1/powers", { signal }).then((body) => body.powers),
+  powers: (signal?: AbortSignal) => request<PowerCatalog>("/api/v1/powers", { signal }),
 
   register: (registration: Registration) =>
     request<Session>("/api/v1/auth/register", { method: "POST", body: registration }),
@@ -239,4 +264,14 @@ export const api = {
 
   gameSnapshot: (token: string, gameID: string, signal?: AbortSignal) =>
     request<GameSnapshot>(`/api/v1/games/${encodeURIComponent(gameID)}`, { token, signal }),
+
+  /** Post-game feedback. Only ever called for a thumbs-down — a thumbs-up is
+   *  acknowledged in the UI and never sent, so the server has no rating field
+   *  and every stored row carries a comment. */
+  submitFeedback: (token: string, gameID: string, comment: string) =>
+    request<void>(`/api/v1/games/${encodeURIComponent(gameID)}/feedback`, {
+      method: "POST",
+      token,
+      body: { comment },
+    }),
 };

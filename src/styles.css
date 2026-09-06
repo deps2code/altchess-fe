@@ -236,3 +236,90 @@ dd { margin: .4rem 0 0; font-family: Georgia, serif; font-size: 1.75rem; }
 @keyframes spin-pawn {
   to { transform: rotate(360deg); }
 }
+
+/* ── The game selector ───────────────────────────────────────────────────
+   The invite form as one instrument panel rather than a stack of fieldsets:
+   a live read-out of the terms at the top, a segmented row for the time
+   control, a recessed block for the power budget, and a single gradient
+   action at the bottom. The powers are named by icon here and nowhere in
+   words — see the comment in Lobby.tsx. */
+.selector { position: relative; gap: 1rem; justify-content: flex-start; padding: 1.75rem; border-color: #ffffff1a; border-radius: 1.25rem; overflow: hidden;
+  background:
+    radial-gradient(22rem 12rem at 88% -12%, #4a5c6840 0%, transparent 70%),
+    linear-gradient(165deg, #22211a 0%, #1a1913 55%, #141310 100%);
+  box-shadow: 0 1.5rem 3.5rem #00000055; }
+/* A lit top edge, so the card reads as raised rather than cut out. */
+.selector::before { content: ""; position: absolute; inset: 0 0 auto; height: 1px; pointer-events: none; background: linear-gradient(90deg, transparent, #ffffff2e 32%, transparent); }
+.selector button { margin: 0; }
+.selector button span { padding: 0; }
+.selector svg { width: 1rem; height: 1rem; flex: none; }
+.selector .error { margin: 0; font-size: .85rem; }
+
+.selector-head h3 { margin: 0; font-family: Georgia, serif; font-size: 1.9rem; font-weight: 400; letter-spacing: -.01em; }
+.selector-summary { display: flex; align-items: center; gap: .4rem; margin: .5rem 0 0; color: #d6a94b; font-size: .85rem; font-weight: 600; font-variant-numeric: tabular-nums; }
+.selector-summary svg { width: .9rem; height: .9rem; }
+.summary-powers { display: inline-flex; align-items: center; gap: .22rem; }
+
+.seg { display: flex; flex-wrap: wrap; gap: .4rem; }
+.seg-tab { display: inline-flex; align-items: center; gap: .4rem; padding: .55rem .95rem; border: 1px solid transparent; border-radius: 999px; color: #b9b4a7; background: #ffffff0d; font-size: .85rem; font-weight: 600; cursor: pointer; }
+.seg-tab:hover { color: #ece8dd; background: #ffffff17; }
+.seg-tab.active { border-color: #d6a94b4d; color: #d6a94b; background: #d6a94b1f; }
+.seg-tab.active:hover { color: #ebc46f; background: #d6a94b29; }
+
+/* Recessed: darker than the card holding it, the way an amount field sits
+   inside a trading sheet. */
+.field { display: flex; flex-direction: column; gap: .85rem; padding: 1rem; border: 1px solid #ffffff12; border-radius: 1rem; background: #0f0f0c8c; }
+.field-head { display: flex; align-items: center; justify-content: space-between; gap: .75rem; }
+.field-label { padding: .3rem .7rem; border-radius: 999px; background: #ffffff0f; color: #8e8a7f; font-size: .66rem; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; }
+.power-chips { display: inline-flex; gap: .4rem; }
+.power-chip { display: inline-flex; align-items: center; gap: .3rem; padding: .3rem .55rem; border: 1px solid #ffffff14; border-radius: .6rem; color: #b9b4a7; font-size: .75rem; font-variant-numeric: tabular-nums; }
+.power-chip svg { width: .95rem; height: .95rem; color: #d6a94b; }
+
+/* The number is the entire label — no per-choice copy at all. */
+.count-row { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: .4rem; }
+.count { padding: .7rem 0; border: 1px solid #ffffff14; border-radius: .75rem; color: #ece8dd; background: none; font-family: Georgia, serif; font-size: 1.5rem; line-height: 1; font-variant-numeric: tabular-nums; cursor: pointer; }
+.count:hover:not([disabled]) { border-color: #d6a94b66; background: #ffffff0a; }
+.count.active { border-color: #d6a94b; color: #171611; background: #d6a94b; }
+.count[disabled] { opacity: .35; cursor: not-allowed; }
+
+.field-foot { margin: 0; color: #8e8a7f; font-size: .76rem; line-height: 1.45; }
+.field-foot.centered { text-align: center; }
+
+/* One action, full width, the brightest thing on the card. */
+.cta { width: 100%; padding: 1rem 1.3rem; border: 0; border-radius: 999px; color: #171611; font-size: 1rem; font-weight: 750; cursor: pointer;
+  background: linear-gradient(90deg, #f0d089 0%, #d6a94b 55%, #c08f34 100%);
+  box-shadow: 0 .6rem 1.6rem #d6a94b2e; }
+.cta:hover:not([disabled]) { background: linear-gradient(90deg, #f7dda3 0%, #ebc46f 55%, #d6a94b 100%); }
+.cta[disabled] { opacity: .6; }
+
+/* ── Eval bar ────────────────────────────────────────────────────────────
+   The board and its rail share a row, so the player bars above and below
+   span both. The rail's background is the side at the top of the board and
+   the fill is the viewer's own side, growing from the bottom. */
+.board-row { display: flex; align-items: flex-start; gap: .55rem; width: min(70vh, 100%); }
+.board-row .board-mount { flex: 1 1 auto; width: auto; min-width: 0; }
+/* The board's own aspect-ratio sets the row's height; the rail stretches to
+   whatever that turns out to be. */
+.eval-rail { position: relative; flex: none; align-self: stretch; width: 1.95rem; border: 1px solid #ffffff26; overflow: hidden; }
+.eval-rail.white-bottom { background: #3a3730; }
+.eval-rail.black-bottom { background: #ece8dd; }
+.eval-rail.idle { opacity: .4; }
+/* Equality, so a fill can be read against something. */
+.eval-rail::after { content: ""; position: absolute; left: 0; right: 0; top: 50%; height: 1px; background: #d6a94b66; pointer-events: none; }
+.eval-fill { position: absolute; left: 0; right: 0; bottom: 0; }
+.white-bottom .eval-fill { background: #ece8dd; }
+.black-bottom .eval-fill { background: #3a3730; }
+.eval-value { position: absolute; top: .2rem; left: 0; right: 0; padding: .12rem 0; color: #ece8dd; background: #0c0e11cc; font-size: .58rem; font-weight: 700; line-height: 1.15; letter-spacing: -.03em; text-align: center; font-variant-numeric: tabular-nums; }
+
+@media (prefers-reduced-motion: no-preference) {
+  .seg-tab, .count, .cta, .power-chip { transition: color 160ms ease, border-color 160ms ease, background-color 160ms ease; }
+  /* The reading is the point of the animation: the bar travels to it rather
+     than snapping, so the size of the swing is visible. */
+  .eval-fill { transition: height 700ms cubic-bezier(.22, 1, .36, 1); }
+  .eval-rail { transition: opacity 260ms ease; }
+  .eval-value { animation: eval-pop 320ms ease-out; }
+}
+
+@keyframes eval-pop {
+  from { opacity: 0; transform: translateY(-.3rem); }
+}

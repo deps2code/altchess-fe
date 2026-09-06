@@ -84,3 +84,44 @@ export function ThumbsDownIcon(props: IconProps) {
     </Svg>
   );
 }
+
+/** The two powers, as marks rather than words: a lamp for `best_move` (the
+ *  engine's suggestion) and a dial for `current_eval` (its verdict). Used
+ *  wherever a budget is shown as a count of charges rather than named. */
+export function BulbIcon(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <path d="M9 18h6M10 21h4" />
+      <path d="M12 3a6 6 0 0 0-3.6 10.8c.5.4.9 1 1 1.7l.1.5h5l.1-.5c.1-.7.5-1.3 1-1.7A6 6 0 0 0 12 3z" />
+    </Svg>
+  );
+}
+
+export function GaugeIcon(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <path d="M3.5 17a9 9 0 1 1 17 0" />
+      <path d="M12 17l4.2-5.2" />
+      <circle cx="12" cy="17" r="1.1" />
+    </Svg>
+  );
+}
+
+export function ClockIcon(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <circle cx="12" cy="12" r="8.5" />
+      <path d="M12 7v5.2l3.2 2" />
+    </Svg>
+  );
+}
+
+/** The upward tick in front of the selector's live summary line. */
+export function TrendIcon(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <path d="M3.5 15.5 9 10l3.5 3.5L20.5 5.5" />
+      <path d="M15.5 5.5h5v5" />
+    </Svg>
+  );
+}

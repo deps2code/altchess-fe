@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { ApiError, api, type Game, type User } from "../api/client";
 import { useAuth } from "../auth/AuthProvider";
+import { BulbIcon, ClockIcon, GaugeIcon, TrendIcon } from "../game/icons";
 import { usePowers } from "../hooks/usePowers";
 import { formatPowers, formatTimeControl } from "./format";
 import { RecentGamesModal } from "./RecentGames";
@@ -12,13 +13,10 @@ const PRESETS = [
 ] as const;
 
 /** Charges of *each* power, per player, for the game about to be created.
- *  Fixed at creation time and shown to the joiner before they accept. */
-const POWER_CHOICES = [
-  { count: 0, label: "None", hint: "plain chess" },
-  { count: 1, label: "1", hint: "of each power" },
-  { count: 2, label: "2", hint: "of each power" },
-  { count: 3, label: "3", hint: "of each power" },
-] as const;
+ *  Fixed at creation time and shown to the joiner before they accept. The
+ *  choices carry no copy of their own: the count is the whole label, and the
+ *  "of each power" it used to spell out is the icon pair above the row. */
+const POWER_CHOICES = [0, 1, 2, 3] as const;
 
 const DEFAULT_POWERS = 1;
 
@@ -88,68 +86,102 @@ export function Lobby({ user, onOpenGame }: { user: User; onOpenGame: (gameID: s
         <ProfileCard user={user} />
       </div>
 
-      <div className="panel">
-        {active ? (
+      {active ? (
+        <div className="panel">
           <ActiveGameCard game={active} viewerID={user.id} onOpenGame={onOpenGame} />
-        ) : (
-          <>
-            <fieldset>
-              <legend>Time control</legend>
-              <div className="choices">
-                {PRESETS.map((option, index) => (
-                  <button
-                    key={option.label}
-                    type="button"
-                    className={index === preset ? "choice active" : "choice"}
-                    aria-pressed={index === preset}
-                    onClick={() => setPreset(index)}
-                  >
-                    <strong>{option.label}</strong>
-                    <span>{formatTimeControl(option.initial, option.increment)}</span>
-                  </button>
-                ))}
-              </div>
-            </fieldset>
-
-            <fieldset>
-              <legend>Powers</legend>
-              <div className="choices">
-                {POWER_CHOICES.map((option) => (
-                  <button
-                    key={option.label}
-                    type="button"
-                    className={option.count === chosenPowers ? "choice active" : "choice"}
-                    aria-pressed={option.count === chosenPowers}
-                    disabled={!powersOffered}
-                    onClick={() => setPowerCount(option.count)}
-                  >
-                    <strong>{option.label}</strong>
-                    <span>{option.hint}</span>
-                  </button>
-                ))}
-              </div>
-              {!powersOffered && (
-                <p className="hint">
-                  This server has no engine configured, so powers are unavailable — this game is plain chess.
-                </p>
-              )}
-            </fieldset>
-
-            <p className="hint">
-              Share the link with a specific person — the first one who opens it while signed in plays as your
-              opponent.
+        </div>
+      ) : (
+        <div className="panel selector">
+          {/* The heading carries a live read-out of the two choices below it,
+              so the terms of the game are legible without re-reading the
+              controls that set them. */}
+          <div className="selector-head">
+            <h3>New game</h3>
+            <p className="selector-summary">
+              <TrendIcon />
+              <span>{formatTimeControl(chosen.initial, chosen.increment)}</span>
+              <span aria-hidden="true">·</span>
+              <span className="summary-powers">
+                {chosenPowers === 0 ? (
+                  "plain chess"
+                ) : (
+                  <>
+                    {chosenPowers}× <BulbIcon /> <GaugeIcon />
+                  </>
+                )}
+              </span>
             </p>
-            {inviteError && (
-              <p className="error" role="alert">
-                {inviteError}
-              </p>
-            )}
-            <button type="button" onClick={() => void createInvite()} disabled={inviteBusy}>
-              {inviteBusy ? "Creating…" : "Create invite link"} <span aria-hidden="true">→</span>
-            </button>
-          </>
-        )}
-      </div>
+          </div>
+
+          <div className="seg" role="group" aria-label="Time control">
+            {PRESETS.map((option, index) => (
+              <button
+                key={option.label}
+                type="button"
+                className={index === preset ? "seg-tab active" : "seg-tab"}
+                aria-pressed={index === preset}
+                onClick={() => setPreset(index)}
+              >
+                {index === preset && <ClockIcon />}
+                {option.label}
+              </button>
+            ))}
+          </div>
+
+          {/* Powers are a count, not a list: the icon pair above the row is
+              what says "of each", so every choice is just its own number. */}
+          <div className="field">
+            <div className="field-head">
+              <span className="field-label">Powers</span>
+              <span className="power-chips">
+                <span className="power-chip" title="Best move" aria-label={`Best move: ${chosenPowers} per player`}>
+                  <BulbIcon /> <b>×{chosenPowers}</b>
+                </span>
+                <span className="power-chip" title="Evaluation" aria-label={`Evaluation: ${chosenPowers} per player`}>
+                  <GaugeIcon /> <b>×{chosenPowers}</b>
+                </span>
+              </span>
+            </div>
+
+            <div className="count-row" role="group" aria-label="Charges of each power, per player">
+              {POWER_CHOICES.map((count) => (
+                <button
+                  key={count}
+                  type="button"
+                  className={count === chosenPowers ? "count active" : "count"}
+                  aria-pressed={count === chosenPowers}
+                  aria-label={count === 0 ? "No powers — plain chess" : `${count} of each power, per player`}
+                  disabled={!powersOffered}
+                  onClick={() => setPowerCount(count)}
+                >
+                  {count}
+                </button>
+              ))}
+            </div>
+
+            <p className="field-foot">
+              {!powersOffered
+                ? "No engine on this server — powers are unavailable."
+                : chosenPowers === 0
+                  ? "Plain chess — no engine help for either side."
+                  : "Per player, per game. One power per turn."}
+            </p>
+          </div>
+
+          {inviteError && (
+            <p className="error" role="alert">
+              {inviteError}
+            </p>
+          )}
+
+          <button type="button" className="cta" onClick={() => void createInvite()} disabled={inviteBusy}>
+            {inviteBusy ? "Creating…" : "Create invite link"}
+          </button>
+          <p className="field-foot centered">
+            Share it with one person — whoever opens it first, signed in, is your opponent.
+          </p>
+        </div>
+      )}
     </section>
   );
 }

@@ -4,6 +4,8 @@ import { useAuth } from "../auth/AuthProvider";
 import { formatTimeControl } from "../lobby/format";
 import { mountGameBoard, type BoardHandle } from "./board";
 import { openGameConnection, type GameConnection } from "./connection";
+import { EvalBar } from "./EvalBar";
+import { formatEvaluation } from "./evaluation";
 import { BoardIcon, HomeIcon, ThumbsDownIcon, ThumbsUpIcon } from "./icons";
 import { capturedMaterial, PIECE_GLYPH, type CapturedPiece } from "./material";
 import type { ErrorFrame, PowerUsedFrame, StateFrame } from "./protocol";
@@ -67,19 +69,6 @@ function describeEnd(viewerColor: "white" | "black", live: LiveState): string {
     return `${label} — draw.`;
   }
   return live.result === viewerColor ? `${label} — you won.` : `${label} — you lost.`;
-}
-
-/** The engine's verdict, always from White's point of view — the same
- *  convention every engine UI uses, and stated as such in the panel. */
-function formatEvaluation(frame: PowerUsedFrame): string {
-  if (frame.mate_in !== undefined) {
-    return `M${Math.abs(frame.mate_in)}${frame.mate_in < 0 ? " for Black" : " for White"}`;
-  }
-  if (frame.score_cp === undefined) {
-    return "—";
-  }
-  const pawns = frame.score_cp / 100;
-  return `${pawns > 0 ? "+" : ""}${pawns.toFixed(2)}`;
 }
 
 export function GameScreen({
@@ -337,6 +326,10 @@ export function GameScreen({
     });
   }
 
+  // The eval bar reads the viewer's own last `current_eval` verdict, and
+  // nothing else: a `best_move` result leaves it where it was, and the next
+  // state frame clears `powerResult` and with it the bar.
+  const evaluation = powerResult?.power === "current_eval" ? powerResult : null;
   const finished = live?.status === "finished" || live?.status === "aborted";
   const playable = live?.status === "pending" || live?.status === "live";
   const material = capturedMaterial(live?.fen ?? "");
@@ -414,7 +407,13 @@ export function GameScreen({
             advantage={-advantage}
           />
 
-          <div ref={boardEl} className="board-mount" />
+          <div className="board-row">
+            <div ref={boardEl} className="board-mount" />
+            {/* Only for a match that agreed to powers at all — a rail that
+                appeared with the first verdict would resize the board
+                mid-game. */}
+            {game.powers_per_player > 0 && <EvalBar viewerColor={viewerColor} evaluation={evaluation} />}
+          </div>
 
           <PlayerBar
             player={playingWhite ? game.white : game.black}

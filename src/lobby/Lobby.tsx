@@ -164,7 +164,7 @@ export function Lobby({ user, onOpenGame }: { user: User; onOpenGame: (gameID: s
                 ? "No engine on this server — powers are unavailable."
                 : chosenPowers === 0
                   ? "Plain chess — no engine help for either side."
-                  : "Per player, per game. One power per turn."}
+                  : "One power per turn."}
             </p>
           </div>
 
@@ -177,9 +177,6 @@ export function Lobby({ user, onOpenGame }: { user: User; onOpenGame: (gameID: s
           <button type="button" className="cta" onClick={() => void createInvite()} disabled={inviteBusy}>
             {inviteBusy ? "Creating…" : "Create invite link"}
           </button>
-          <p className="field-foot centered">
-            Share it with one person — whoever opens it first, signed in, is your opponent.
-          </p>
         </div>
       )}
     </section>

@@ -4,50 +4,49 @@ import { formatEvaluationShort, whiteShare, type Evaluation } from "./evaluation
  *  out in the side panel: a vertical bar whose fill is the viewer's own side,
  *  growing from the bottom the way that side sits on the board.
  *
- *  It is rendered for the whole game whenever the match has any power budget
- *  at all, rather than appearing with the first verdict — a bar that came and
- *  went would resize the board under a live game. With no verdict to show it
- *  sits dimmed at the halfway mark, and every later reading animates from
- *  wherever the last one left it.
- *
- *  Private, like every other power result: this only ever renders the
- *  viewer's own `power_used` frame, and the opponent is told nothing. */
+ *  Visible only while its reading is still fresh for the position it was
+ *  asked about — the next move clears `evaluation` and the bar fades out
+ *  with it, rather than sitting on screen as a stale or placeholder value.
+ *  The rail's own box stays in the layout either way (`opacity`, not
+ *  `display`/unmounting), so the board never resizes as it comes and goes. */
 export function EvalBar({
   viewerColor,
   evaluation,
 }: {
   viewerColor: "white" | "black";
   /** null between verdicts — a reading belongs to the position it was asked
-   *  about, so the next move clears it. */
+   *  about, so the next move clears it, and with it the bar. */
   evaluation: Evaluation | null;
 }) {
+  const visible = evaluation !== null;
   const white = evaluation ? whiteShare(evaluation) : 0.5;
   const bottom = viewerColor === "white" ? white : 1 - white;
-  const label = evaluation ? formatEvaluationShort(evaluation) : "—";
+  const label = evaluation ? formatEvaluationShort(evaluation) : "";
   const classes = [
     "eval-rail",
     viewerColor === "white" ? "white-bottom" : "black-bottom",
-    evaluation ? "live" : "idle",
-  ].join(" ");
+    visible ? "is-live" : "",
+  ]
+    .filter(Boolean)
+    .join(" ");
 
   return (
     <div
       className={classes}
-      role="img"
-      aria-label={
-        evaluation
-          ? `Evaluation ${label}, from White's point of view`
-          : "Evaluation — spend a power to see it"
-      }
-      title={evaluation ? `${label} for White` : "Evaluation"}
+      role={visible ? "img" : undefined}
+      aria-hidden={!visible}
+      aria-label={visible ? `Evaluation ${label}, from White's point of view` : undefined}
+      title={visible ? `${label} for White` : undefined}
     >
       {/* The height is the datum itself, not styling, so it is the one thing
           here that cannot live in styles.css. */}
       <div className="eval-fill" style={{ height: `${(bottom * 100).toFixed(1)}%` }} />
       {/* Keyed by the reading so each new verdict replays its own entrance. */}
-      <span key={label} className="eval-value">
-        {label}
-      </span>
+      {visible && (
+        <span key={label} className="eval-value">
+          {label}
+        </span>
+      )}
     </div>
   );
 }

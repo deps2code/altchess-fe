@@ -300,10 +300,14 @@ dd { margin: .4rem 0 0; font-family: Georgia, serif; font-size: 1.75rem; }
 .board-row .board-mount { flex: 1 1 auto; width: auto; min-width: 0; }
 /* The board's own aspect-ratio sets the row's height; the rail stretches to
    whatever that turns out to be. */
-.eval-rail { position: relative; flex: none; align-self: stretch; width: 1.95rem; border: 1px solid #ffffff26; overflow: hidden; }
+/* Hidden by default (opacity, not display/unmounting — its box stays in the
+   flex row either way, so the board never resizes as a reading comes and
+   goes) and shown only while `.is-live`, i.e. only for the turn its reading
+   was asked about. */
+.eval-rail { position: relative; flex: none; align-self: stretch; width: 1.95rem; border: 1px solid #ffffff26; overflow: hidden; opacity: 0; pointer-events: none; }
+.eval-rail.is-live { opacity: 1; pointer-events: auto; }
 .eval-rail.white-bottom { background: #3a3730; }
 .eval-rail.black-bottom { background: #ece8dd; }
-.eval-rail.idle { opacity: .4; }
 /* Equality, so a fill can be read against something. */
 .eval-rail::after { content: ""; position: absolute; left: 0; right: 0; top: 50%; height: 1px; background: #d6a94b66; pointer-events: none; }
 .eval-fill { position: absolute; left: 0; right: 0; bottom: 0; }

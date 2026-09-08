@@ -70,7 +70,14 @@ export function mountGameBoard(
     return {
       color: live ? playerColor : undefined,
       free: false,
+      // chessgroundDests deliberately includes both castling destinations —
+      // the visual square and the king-takes-own-rook square — so chessground
+      // can support either drag style. rookCastle: false is what makes it
+      // pick the visual one: without it a king dropped on its own rook sends
+      // "e8a8" for the UCI move, which the server's UCI parser rejects since
+      // it expects the king's actual destination square ("e8c8").
       dests: live ? chessgroundDests(chess) : new Map(),
+      rookCastle: false,
       events: {
         after: (orig, dest) => {
           onMove(withAutoQueen(chess, orig, dest), ply);

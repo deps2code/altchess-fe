@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { ApiError, api, type Game, type GameSnapshot } from "../api/client";
+import { ApiError, api, type Game, type GameSnapshot, type PublicUser } from "../api/client";
 import { useAuth } from "../auth/AuthProvider";
 import { formatPowers, formatTimeControl } from "../lobby/format";
 import { CheckIcon, CloseIcon, CopyIcon } from "./icons";
@@ -105,7 +105,14 @@ export function GameLink({
   const { game } = snapshot;
 
   if (snapshot.status === "waiting") {
-    if (game.white.id === viewerID) {
+    // While nobody has joined, the one filled seat is the creator's —
+    // whichever colour they picked. Neither seat being filled is impossible
+    // (the games_has_a_creator constraint), so it reads as unavailable.
+    const creator = game.white ?? game.black;
+    if (!creator) {
+      return <Unavailable message="This game isn't available to you." onLeaveToLobby={onLeaveToLobby} />;
+    }
+    if (creator.id === viewerID) {
       return (
         <WaitingRoom
           gameID={gameID}
@@ -119,6 +126,7 @@ export function GameLink({
     return (
       <JoinPrompt
         game={game}
+        creator={creator}
         busy={joinBusy}
         error={joinError}
         onJoin={() => void join()}
@@ -127,9 +135,9 @@ export function GameLink({
     );
   }
 
-  const isParticipant = game.white.id === viewerID || game.black?.id === viewerID;
-  if (isParticipant && game.black) {
-    const playable: PlayableGame = { ...game, black: game.black };
+  const isParticipant = game.white?.id === viewerID || game.black?.id === viewerID;
+  if (isParticipant && game.white && game.black) {
+    const playable: PlayableGame = { ...game, white: game.white, black: game.black };
     return <GameScreen game={playable} viewerID={viewerID} onGameEnded={onLeaveToLobby} />;
   }
 
@@ -192,8 +200,8 @@ function WaitingRoom({
         </h3>
         <p className="hint">
           {formatTimeControl(game.initial_seconds, game.increment_seconds)} ·{" "}
-          {formatPowers(game.powers_per_player)} · share this link — the first person who opens it while signed
-          in joins as your opponent.
+          {formatPowers(game.powers_per_player)} · you play {game.white ? "white" : "black"} · share this link —
+          the first person who opens it while signed in joins as your opponent.
         </p>
         <label htmlFor="invite-link" className="hint">
           Invite link
@@ -238,12 +246,16 @@ function WaitingRoom({
 
 function JoinPrompt({
   game,
+  creator,
   busy,
   error,
   onJoin,
   onLeaveToLobby,
 }: {
   game: Game;
+  /** The one filled seat of a waiting invite — passed in rather than derived
+   *  again here, since the caller has already narrowed it. */
+  creator: PublicUser;
   busy: boolean;
   error: string | null;
   onJoin: () => void;
@@ -255,12 +267,14 @@ function JoinPrompt({
         <span className="spinner-pawn" aria-hidden="true">
           ♟
         </span>
-        <h3 id="join-heading">{game.white.display_name} invited you to play</h3>
-        {/* The power budget is fixed by the creator, so this is what the
-            joiner is agreeing to — shown before they accept, not after. */}
+        <h3 id="join-heading">{creator.display_name} invited you to play</h3>
+        {/* The power budget and the creator's colour are both fixed already,
+            so this is what the joiner is agreeing to — shown before they
+            accept, not after. */}
         <p className="hint">
           {formatTimeControl(game.initial_seconds, game.increment_seconds)} ·{" "}
-          {formatPowers(game.powers_per_player)} · @{game.white.username} · {game.white.rating}
+          {formatPowers(game.powers_per_player)} · you play {game.white ? "black" : "white"} · @
+          {creator.username} · {creator.rating}
         </p>
         {error && (
           <p className="error" role="alert">

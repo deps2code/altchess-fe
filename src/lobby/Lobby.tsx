@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { ApiError, api, type Game, type User } from "../api/client";
+import { ApiError, api, type Game, type PlayerColor, type User } from "../api/client";
 import { useAuth } from "../auth/AuthProvider";
 import { BulbIcon, ChipIcon, ClockIcon, GaugeIcon, PersonIcon, TrendIcon } from "../game/icons";
 import { useBots } from "../hooks/useBots";
@@ -30,6 +30,11 @@ const POWER_CHOICES = [0, 1, 2, 3] as const;
 
 const DEFAULT_POWERS = 1;
 
+/** The side the creator takes; whoever joins — a friend or the engine — gets
+ *  the other one. White is the default because it is what every game created
+ *  before this picker existed used. */
+const COLOR_CHOICES: readonly PlayerColor[] = ["white", "black"];
+
 export function Lobby({ user, onOpenGame }: { user: User; onOpenGame: (gameID: string) => void }) {
   const { authorized } = useAuth();
   const powers = usePowers();
@@ -38,6 +43,7 @@ export function Lobby({ user, onOpenGame }: { user: User; onOpenGame: (gameID: s
   const [preset, setPreset] = useState<number>(1);
   const [botLevel, setBotLevel] = useState<number>(DEFAULT_BOT_LEVEL);
   const [powerCount, setPowerCount] = useState<number>(DEFAULT_POWERS);
+  const [color, setColor] = useState<PlayerColor>("white");
   const [inviteBusy, setInviteBusy] = useState(false);
   const [inviteError, setInviteError] = useState<string | null>(null);
   // The one game this account is currently in, if any — an open invite of
@@ -89,11 +95,13 @@ export function Lobby({ user, onOpenGame }: { user: User; onOpenGame: (gameID: s
               increment_seconds: chosen.increment,
               level: chosenBot?.level ?? DEFAULT_BOT_LEVEL,
               powers_per_player: chosenPowers,
+              color,
             })
           : api.createInvite(token, {
               initial_seconds: chosen.initial,
               increment_seconds: chosen.increment,
               powers_per_player: chosenPowers,
+              color,
             }),
       );
       onOpenGame(created.id);
@@ -139,6 +147,8 @@ export function Lobby({ user, onOpenGame }: { user: User; onOpenGame: (gameID: s
                 </>
               )}
               <span>{formatTimeControl(chosen.initial, chosen.increment)}</span>
+              <span aria-hidden="true">·</span>
+              <span>as {color}</span>
               <span aria-hidden="true">·</span>
               <span className="summary-powers">
                 {chosenPowers === 0 ? (
@@ -188,6 +198,37 @@ export function Lobby({ user, onOpenGame }: { user: User; onOpenGame: (gameID: s
                 {option.label}
               </button>
             ))}
+          </div>
+
+          {/* Which side the creator takes. The caption spells out the only
+              consequence that isn't obvious from the word itself — who is on
+              move when the game opens. */}
+          <div className="field">
+            <div className="field-head">
+              <span className="field-label">Your side</span>
+            </div>
+
+            <div className="seg" role="group" aria-label="Your side">
+              {COLOR_CHOICES.map((option) => (
+                <button
+                  key={option}
+                  type="button"
+                  className={option === color ? "seg-tab active" : "seg-tab"}
+                  aria-pressed={option === color}
+                  onClick={() => setColor(option)}
+                >
+                  {option === "white" ? "White" : "Black"}
+                </button>
+              ))}
+            </div>
+
+            <p className="field-foot">
+              {color === "white"
+                ? "You move first."
+                : playingComputer
+                  ? "The computer moves first."
+                  : "Your opponent moves first."}
+            </p>
           </div>
 
           {/* Difficulty, like powers below it, is a row of bare numbers: the
@@ -308,7 +349,9 @@ function ActiveGameCard({
   onOpenGame: (gameID: string) => void;
 }) {
   const waiting = game.status === "waiting";
-  const opponent = game.white.id === viewerID ? game.black : game.white;
+  // Either seat can be the viewer's own now, and the other one is empty while
+  // an invite is still waiting — so this is nullable on both sides.
+  const opponent = game.white?.id === viewerID ? game.black : game.white;
 
   return (
     <div className="active-game">

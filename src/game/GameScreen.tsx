@@ -12,7 +12,7 @@ import type { ErrorFrame, PowerUsedFrame, StateFrame } from "./protocol";
 
 /** GameScreen only ever mounts once both players are known — a "waiting"
  *  invite gets its own screen (GameLink) instead. */
-export type PlayableGame = Game & { black: PublicUser };
+export type PlayableGame = Game & { white: PublicUser; black: PublicUser };
 
 type LiveState = {
   fen: string;

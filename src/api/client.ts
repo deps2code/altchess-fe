@@ -100,11 +100,15 @@ export type Seek = {
   expires_at: string;
 };
 
-/** black is null while status is "waiting" — an invite link with no
- *  opponent yet. Every other status guarantees it's populated. */
+/** Which side a game's creator takes; the opponent gets the other one. */
+export type PlayerColor = "white" | "black";
+
+/** Exactly one of white/black is null while status is "waiting" — the seat
+ *  the invite's creator didn't pick. Every other status guarantees both are
+ *  populated. */
 export type Game = {
   id: string;
-  white: PublicUser;
+  white: PublicUser | null;
   black: PublicUser | null;
   initial_seconds: number;
   increment_seconds: number;
@@ -113,10 +117,10 @@ export type Game = {
   /** Charges of *each* power both players get in this game, fixed when the
    *  invite was created. 0 is plain chess. */
   powers_per_player: number;
-  /** Set only for a game against an engine opponent, which always plays
-   *  black. It is how the client tells the two kinds of game apart — there is
-   *  no is_bot flag on the wire — and why such a game shows no rating change:
-   *  bot games are unrated. */
+  /** Set only for a game against an engine opponent, which plays whichever
+   *  side its human didn't pick. It is how the client tells the two kinds of
+   *  game apart — there is no is_bot flag on the wire — and why such a game
+   *  shows no rating change: bot games are unrated. */
   bot_level?: number;
 };
 
@@ -130,6 +134,9 @@ export type InviteRequest = {
   initial_seconds: number;
   increment_seconds: number;
   powers_per_player: number;
+  /** The creator's own side. Omitted means white, which is what this
+   *  endpoint always did before there was a picker. */
+  color?: PlayerColor;
 };
 
 /** Starting a game against the engine. Unlike an invite this produces a
@@ -139,6 +146,9 @@ export type BotGameRequest = {
   increment_seconds: number;
   level: number;
   powers_per_player: number;
+  /** The caller's own side; the engine takes the other one, so picking black
+   *  starts a game the computer is already on move in. */
+  color?: PlayerColor;
 };
 
 export type SeekResult = {

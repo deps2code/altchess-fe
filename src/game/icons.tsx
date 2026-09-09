@@ -116,6 +116,26 @@ export function ClockIcon(props: IconProps) {
   );
 }
 
+/** The two opponent kinds in the lobby's first row: a person to invite, or
+ *  the engine to play. */
+export function PersonIcon(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <circle cx="12" cy="8" r="3.6" />
+      <path d="M4.8 20a7.2 7.2 0 0 1 14.4 0" />
+    </Svg>
+  );
+}
+
+export function ChipIcon(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <rect x="7" y="7" width="10" height="10" rx="1.6" />
+      <path d="M10 3.5v3.5M14 3.5v3.5M10 17v3.5M14 17v3.5M3.5 10H7M3.5 14H7M17 10h3.5M17 14h3.5" />
+    </Svg>
+  );
+}
+
 /** The upward tick in front of the selector's live summary line. */
 export function TrendIcon(props: IconProps) {
   return (

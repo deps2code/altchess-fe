@@ -15,6 +15,23 @@ export type PowerCatalog = {
   available: boolean;
 };
 
+/** One engine difficulty. The server deliberately never sends *how* the
+ *  engine is held back at each level — only who you would be playing. */
+export type BotLevel = {
+  level: number;
+  name: string;
+  description: string;
+  rating: number;
+};
+
+/** `available` is the same engine flag `PowerCatalog` carries: powers and bot
+ *  opponents both run on the one Stockfish, so a server without it offers
+ *  neither. */
+export type BotCatalog = {
+  levels: BotLevel[];
+  available: boolean;
+};
+
 export type User = {
   id: string;
   username: string;
@@ -42,7 +59,10 @@ export type GameSummary = {
   played_white: boolean;
   result: "win" | "loss" | "draw" | "aborted";
   end_reason?: string;
+  /** Absent for an abort and for a bot game — neither is rated. */
   rating_change?: number;
+  /** Set only for a game against an engine opponent. */
+  bot_level?: number;
   initial_seconds: number;
   increment_seconds: number;
   ended_at: string;
@@ -93,6 +113,11 @@ export type Game = {
   /** Charges of *each* power both players get in this game, fixed when the
    *  invite was created. 0 is plain chess. */
   powers_per_player: number;
+  /** Set only for a game against an engine opponent, which always plays
+   *  black. It is how the client tells the two kinds of game apart — there is
+   *  no is_bot flag on the wire — and why such a game shows no rating change:
+   *  bot games are unrated. */
+  bot_level?: number;
 };
 
 export type SeekRequest = {
@@ -104,6 +129,15 @@ export type SeekRequest = {
 export type InviteRequest = {
   initial_seconds: number;
   increment_seconds: number;
+  powers_per_player: number;
+};
+
+/** Starting a game against the engine. Unlike an invite this produces a
+ *  playable game straight away — the opponent already exists. */
+export type BotGameRequest = {
+  initial_seconds: number;
+  increment_seconds: number;
+  level: number;
   powers_per_player: number;
 };
 
@@ -228,6 +262,8 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
 export const api = {
   powers: (signal?: AbortSignal) => request<PowerCatalog>("/api/v1/powers", { signal }),
 
+  bots: (signal?: AbortSignal) => request<BotCatalog>("/api/v1/bots", { signal }),
+
   register: (registration: Registration) =>
     request<Session>("/api/v1/auth/register", { method: "POST", body: registration }),
 
@@ -255,6 +291,12 @@ export const api = {
 
   createInvite: (token: string, invite: InviteRequest) =>
     request<Game>("/api/v1/games/invite", { method: "POST", token, body: invite }),
+
+  /** Returns a game that is already playable — there is no waiting room and
+   *  nobody to join. Refused with 503 `bots_unavailable` on a server with no
+   *  engine. */
+  createBotGame: (token: string, game: BotGameRequest) =>
+    request<Game>("/api/v1/games/bot", { method: "POST", token, body: game }),
 
   joinGame: (token: string, gameID: string) =>
     request<Game>(`/api/v1/games/${encodeURIComponent(gameID)}/join`, { method: "POST", token }),

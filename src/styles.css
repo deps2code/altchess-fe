@@ -277,6 +277,9 @@ dd { margin: .4rem 0 0; font-family: Georgia, serif; font-size: 1.75rem; }
 
 /* The number is the entire label — no per-choice copy at all. */
 .count-row { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: .4rem; }
+/* Five difficulty levels rather than four power counts, on one row so the two
+   pickers still read as the same control. */
+.count-row.wide { grid-template-columns: repeat(5, minmax(0, 1fr)); }
 .count { padding: .7rem 0; border: 1px solid #ffffff14; border-radius: .75rem; color: #ece8dd; background: none; font-family: Georgia, serif; font-size: 1.5rem; line-height: 1; font-variant-numeric: tabular-nums; cursor: pointer; }
 .count:hover:not([disabled]) { border-color: #d6a94b66; background: #ffffff0a; }
 .count.active { border-color: #d6a94b; color: #171611; background: #d6a94b; }

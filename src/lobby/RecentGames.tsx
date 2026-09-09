@@ -78,7 +78,11 @@ export function RecentGamesModal({ onClose }: { onClose: () => void }) {
                 </span>
                 <span className="game-history-meta">
                   {formatTimeControl(game.initial_seconds, game.increment_seconds)} ·{" "}
-                  {formatRatingChange(game.rating_change)} · {formatEndedAt(game.ended_at)}
+                  {/* A bot game has no rating change to show because it was
+                      never rated — different from an abort, which is rated
+                      games' own "didn't count". */}
+                  {game.bot_level != null ? "unrated" : formatRatingChange(game.rating_change)} ·{" "}
+                  {formatEndedAt(game.ended_at)}
                 </span>
               </li>
             ))}

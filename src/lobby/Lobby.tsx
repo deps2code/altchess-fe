@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useState } from "react";
 import { ApiError, api, type Game, type User } from "../api/client";
 import { useAuth } from "../auth/AuthProvider";
-import { BulbIcon, ClockIcon, GaugeIcon, TrendIcon } from "../game/icons";
+import { BulbIcon, ChipIcon, ClockIcon, GaugeIcon, PersonIcon, TrendIcon } from "../game/icons";
+import { useBots } from "../hooks/useBots";
 import { usePowers } from "../hooks/usePowers";
 import { formatPowers, formatTimeControl } from "./format";
 import { RecentGamesModal } from "./RecentGames";
@@ -11,6 +12,15 @@ const PRESETS = [
   { label: "5 min", initial: 300, increment: 0 },
   { label: "10 min", initial: 600, increment: 0 },
 ] as const;
+
+/** Who the game is against. "friend" produces a shareable invite link and a
+ *  waiting room; "computer" produces a game that is already playable, because
+ *  its opponent already exists. */
+type Opponent = "friend" | "computer";
+
+/** The difficulty a fresh visitor lands on — low enough to be a game rather
+ *  than a demonstration. The catalog itself comes from the server. */
+const DEFAULT_BOT_LEVEL = 2;
 
 /** Charges of *each* power, per player, for the game about to be created.
  *  Fixed at creation time and shown to the joiner before they accept. The
@@ -23,7 +33,10 @@ const DEFAULT_POWERS = 1;
 export function Lobby({ user, onOpenGame }: { user: User; onOpenGame: (gameID: string) => void }) {
   const { authorized } = useAuth();
   const powers = usePowers();
+  const bots = useBots();
+  const [opponent, setOpponent] = useState<Opponent>("friend");
   const [preset, setPreset] = useState<number>(1);
+  const [botLevel, setBotLevel] = useState<number>(DEFAULT_BOT_LEVEL);
   const [powerCount, setPowerCount] = useState<number>(DEFAULT_POWERS);
   const [inviteBusy, setInviteBusy] = useState(false);
   const [inviteError, setInviteError] = useState<string | null>(null);
@@ -37,6 +50,13 @@ export function Lobby({ user, onOpenGame }: { user: User; onOpenGame: (gameID: s
   // the picker is forced there rather than offering charges nothing can spend.
   const powersOffered = powers.status !== "ready" || powers.available;
   const chosenPowers = powersOffered ? powerCount : 0;
+  // The engine behind the powers is the same one the bots play on, so a
+  // server without it offers neither. Unlike the power picker this can't fall
+  // back to a lesser choice — there is simply no opponent — so the tab is
+  // disabled outright rather than silently reinterpreted.
+  const botsOffered = bots.status === "ready" && bots.available && bots.levels.length > 0;
+  const chosenBot = bots.levels.find((level) => level.level === botLevel) ?? bots.levels[0];
+  const playingComputer = opponent === "computer";
 
   const loadActive = useCallback(
     async (signal?: AbortSignal) => {
@@ -55,20 +75,33 @@ export function Lobby({ user, onOpenGame }: { user: User; onOpenGame: (gameID: s
     return () => controller.abort();
   }, [loadActive]);
 
-  async function createInvite() {
+  /** Both opponents end on the same screen — a `/?game={id}` link — so the
+   *  only difference is which endpoint writes the row and whether anyone has
+   *  to join it afterwards. */
+  async function startGame() {
     setInviteBusy(true);
     setInviteError(null);
     try {
-      const invite = await authorized((token) =>
-        api.createInvite(token, {
-          initial_seconds: chosen.initial,
-          increment_seconds: chosen.increment,
-          powers_per_player: chosenPowers,
-        }),
+      const created = await authorized((token) =>
+        playingComputer
+          ? api.createBotGame(token, {
+              initial_seconds: chosen.initial,
+              increment_seconds: chosen.increment,
+              level: chosenBot?.level ?? DEFAULT_BOT_LEVEL,
+              powers_per_player: chosenPowers,
+            })
+          : api.createInvite(token, {
+              initial_seconds: chosen.initial,
+              increment_seconds: chosen.increment,
+              powers_per_player: chosenPowers,
+            }),
       );
-      onOpenGame(invite.id);
+      onOpenGame(created.id);
     } catch (cause) {
-      setInviteError(cause instanceof ApiError ? cause.message : "Could not create an invite link.");
+      const fallback = playingComputer
+        ? "Could not start a game against the computer."
+        : "Could not create an invite link.";
+      setInviteError(cause instanceof ApiError ? cause.message : fallback);
       setInviteBusy(false);
       // A 409 here means a game was started elsewhere since this screen
       // loaded; re-reading it turns the refusal into a way back in.
@@ -82,7 +115,7 @@ export function Lobby({ user, onOpenGame }: { user: User; onOpenGame: (gameID: s
     <section className="lobby" aria-labelledby="lobby-heading">
       <div>
         <p className="section-number">01 / LOBBY</p>
-        <h2 id="lobby-heading">Invite a friend.</h2>
+        <h2 id="lobby-heading">{playingComputer ? "Play the computer." : "Invite a friend."}</h2>
         <ProfileCard user={user} />
       </div>
 
@@ -99,6 +132,12 @@ export function Lobby({ user, onOpenGame }: { user: User; onOpenGame: (gameID: s
             <h3>New game</h3>
             <p className="selector-summary">
               <TrendIcon />
+              {playingComputer && chosenBot && (
+                <>
+                  <span>{chosenBot.name}</span>
+                  <span aria-hidden="true">·</span>
+                </>
+              )}
               <span>{formatTimeControl(chosen.initial, chosen.increment)}</span>
               <span aria-hidden="true">·</span>
               <span className="summary-powers">
@@ -111,6 +150,29 @@ export function Lobby({ user, onOpenGame }: { user: User; onOpenGame: (gameID: s
                 )}
               </span>
             </p>
+          </div>
+
+          {/* Opponent first: it is the one choice that changes what the
+              button at the bottom actually does. */}
+          <div className="seg" role="group" aria-label="Opponent">
+            <button
+              type="button"
+              className={playingComputer ? "seg-tab" : "seg-tab active"}
+              aria-pressed={!playingComputer}
+              onClick={() => setOpponent("friend")}
+            >
+              <PersonIcon />A friend
+            </button>
+            <button
+              type="button"
+              className={playingComputer ? "seg-tab active" : "seg-tab"}
+              aria-pressed={playingComputer}
+              disabled={!botsOffered}
+              onClick={() => setOpponent("computer")}
+            >
+              <ChipIcon />
+              The computer
+            </button>
           </div>
 
           <div className="seg" role="group" aria-label="Time control">
@@ -127,6 +189,43 @@ export function Lobby({ user, onOpenGame }: { user: User; onOpenGame: (gameID: s
               </button>
             ))}
           </div>
+
+          {/* Difficulty, like powers below it, is a row of bare numbers: the
+              level's own name and description do the talking underneath, and
+              the chip carries the strength that number stands for. */}
+          {playingComputer && (
+            <div className="field">
+              <div className="field-head">
+                <span className="field-label">Difficulty</span>
+                <span className="power-chips">
+                  <span
+                    className="power-chip"
+                    title="Approximate strength"
+                    aria-label={chosenBot ? `Rated about ${chosenBot.rating}` : "Strength unknown"}
+                  >
+                    <ChipIcon /> <b>{chosenBot?.rating ?? "—"}</b>
+                  </span>
+                </span>
+              </div>
+
+              <div className="count-row wide" role="group" aria-label="Difficulty level">
+                {bots.levels.map((level) => (
+                  <button
+                    key={level.level}
+                    type="button"
+                    className={level.level === chosenBot?.level ? "count active" : "count"}
+                    aria-pressed={level.level === chosenBot?.level}
+                    aria-label={`${level.name}, rated about ${level.rating}`}
+                    onClick={() => setBotLevel(level.level)}
+                  >
+                    {level.level}
+                  </button>
+                ))}
+              </div>
+
+              <p className="field-foot">{chosenBot?.description ?? "Loading opponents…"}</p>
+            </div>
+          )}
 
           {/* Powers are a count, not a list: the icon pair above the row is
               what says "of each", so every choice is just its own number. */}
@@ -174,9 +273,21 @@ export function Lobby({ user, onOpenGame }: { user: User; onOpenGame: (gameID: s
             </p>
           )}
 
-          <button type="button" className="cta" onClick={() => void createInvite()} disabled={inviteBusy}>
-            {inviteBusy ? "Creating…" : "Create invite link"}
+          <button type="button" className="cta" onClick={() => void startGame()} disabled={inviteBusy}>
+            {playingComputer
+              ? inviteBusy
+                ? "Starting…"
+                : `Play ${chosenBot?.name ?? "the computer"}`
+              : inviteBusy
+                ? "Creating…"
+                : "Create invite link"}
           </button>
+
+          {playingComputer && (
+            <p className="field-foot centered">
+              Games against the computer are unrated, and start the moment you press play.
+            </p>
+          )}
         </div>
       )}
     </section>
@@ -205,6 +316,7 @@ function ActiveGameCard({
       <h3>{waiting ? "Your invite is open" : `Playing ${opponent?.display_name ?? "your opponent"}`}</h3>
       <p className="hint">
         {formatTimeControl(game.initial_seconds, game.increment_seconds)} · {formatPowers(game.powers_per_player)} ·{" "}
+        {game.bot_level != null ? "unrated · " : ""}
         {waiting
           ? "nobody has taken the link yet. Reopen it to share or cancel it."
           : "you can only be in one game at a time — finish or abort this one to start another."}

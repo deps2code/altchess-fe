@@ -210,8 +210,13 @@ dd { margin: .4rem 0 0; font-family: Georgia, serif; font-size: 1.75rem; }
 
 .powers-panel { margin-top: 2rem; padding-top: 1.5rem; border-top: 1px solid #ffffff20; }
 .powers-panel .section-number { margin: 0 0 .75rem; }
-.power-buttons { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .5rem; }
-.power-buttons .choice { margin: 0; }
+/* One column of row-shaped cards, not a grid of square ones: three powers in
+   an ~18rem aside leave no room for a label plus a count per column without
+   wrapping. Each row reads as "Try a move …… 2 left". */
+.power-buttons { display: grid; grid-template-columns: minmax(0, 1fr); gap: .5rem; }
+.power-buttons .choice { margin: 0; flex-direction: row; align-items: baseline; justify-content: space-between; gap: .6rem; }
+.try-move-preview { margin-top: .85rem; }
+.try-move-preview .modal-actions { justify-content: flex-start; margin-top: .65rem; }
 .power-result { margin: .85rem 0 0; padding: .65rem .8rem; border: 1px solid #d6a94b55; color: #ece8dd; font-size: .9rem; }
 .power-result strong { color: #d6a94b; font-family: Georgia, serif; font-size: 1.15rem; }
 
@@ -325,6 +330,11 @@ dd { margin: .4rem 0 0; font-family: Georgia, serif; font-size: 1.75rem; }
   .eval-fill { transition: height 700ms cubic-bezier(.22, 1, .36, 1); }
   .eval-rail { transition: opacity 260ms ease; }
   .eval-value { animation: eval-pop 320ms ease-out; }
+  /* try_move's before reading is laid out with no transition — it is a
+     baseline, not news — so only the after reading sweeps in. Higher
+     specificity than .eval-fill above is what lets this win regardless of
+     source order. */
+  .eval-rail.instant .eval-fill { transition: none; }
 }
 
 @keyframes eval-pop {

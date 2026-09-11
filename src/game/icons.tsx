@@ -85,9 +85,10 @@ export function ThumbsDownIcon(props: IconProps) {
   );
 }
 
-/** The two powers, as marks rather than words: a lamp for `best_move` (the
- *  engine's suggestion) and a dial for `current_eval` (its verdict). Used
- *  wherever a budget is shown as a count of charges rather than named. */
+/** The three powers, as marks rather than words: a lamp for `best_move` (the
+ *  engine's suggestion), a dial for `current_eval` (its verdict), and a
+ *  flask for `try_move` (try it and see). Used wherever a budget is shown as
+ *  a count of charges rather than named. */
 export function BulbIcon(props: IconProps) {
   return (
     <Svg {...props}>
@@ -103,6 +104,16 @@ export function GaugeIcon(props: IconProps) {
       <path d="M3.5 17a9 9 0 1 1 17 0" />
       <path d="M12 17l4.2-5.2" />
       <circle cx="12" cy="17" r="1.1" />
+    </Svg>
+  );
+}
+
+export function FlaskIcon(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <path d="M9 3h6" />
+      <path d="M10 3v6.5L4.8 18a2 2 0 0 0 1.7 3h11a2 2 0 0 0 1.7-3L14 9.5V3" />
+      <path d="M7.5 15h9" />
     </Svg>
   );
 }

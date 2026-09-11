@@ -12,11 +12,20 @@ import { formatEvaluationShort, whiteShare, type Evaluation } from "./evaluation
 export function EvalBar({
   viewerColor,
   evaluation,
+  instant = false,
 }: {
   viewerColor: "white" | "black";
   /** null between verdicts — a reading belongs to the position it was asked
    *  about, so the next move clears it, and with it the bar. */
   evaluation: Evaluation | null;
+  /** True for the render that first lays a fresh reading out with no
+   *  transition, so a later render can animate *from* it rather than from
+   *  wherever the bar happened to be. try_move uses this for its before →
+   *  after sweep: the before reading is painted instantly, then a later
+   *  render switches to the after reading with this back at its default, so
+   *  the existing height transition carries it there. Every other caller
+   *  leaves this at its default and keeps the bar's plain cross-fade. */
+  instant?: boolean;
 }) {
   const visible = evaluation !== null;
   const white = evaluation ? whiteShare(evaluation) : 0.5;
@@ -26,6 +35,7 @@ export function EvalBar({
     "eval-rail",
     viewerColor === "white" ? "white-bottom" : "black-bottom",
     visible ? "is-live" : "",
+    instant ? "instant" : "",
   ]
     .filter(Boolean)
     .join(" ");

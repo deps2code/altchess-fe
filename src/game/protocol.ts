@@ -7,6 +7,9 @@ export type ClientMessage = {
   type: "move" | "resign" | "use_power";
   command_id: string;
   expected_ply: number;
+  /** Meaningful for "move", and for a "use_power" whose power takes a
+   *  candidate (try_move). Ignored, not rejected, by a use_power for any
+   *  other power. */
   uci?: string;
   power?: PowerID;
 };
@@ -29,7 +32,15 @@ export type StateFrame = {
 
 /** The engine's answer, sent only to the player who asked. `remaining` is
  *  that player's own count for that power after the spend, and is the only
- *  charge count that ever crosses the wire. */
+ *  charge count that ever crosses the wire.
+ *
+ *  `fen`/`score_cp`/`mate_in` keep their plain meaning for every power — the
+ *  live position and its eval — which for try_move is the *before* reading.
+ *  The `after_*` fields are try_move only: the candidate that was tried, the
+ *  position it leads to, and either its eval (`after_score_cp`/
+ *  `after_mate_in`) or, when the candidate ends the game, `after_outcome`
+ *  instead (never both — a mate score alone can't say who mated whom for an
+ *  already-decided position). */
 export type PowerUsedFrame = {
   type: "power_used";
   command_id: string;
@@ -40,6 +51,11 @@ export type PowerUsedFrame = {
   best_move?: string;
   score_cp?: number;
   mate_in?: number;
+  candidate_uci?: string;
+  after_fen?: string;
+  after_score_cp?: number;
+  after_mate_in?: number;
+  after_outcome?: "checkmate" | "stalemate" | "draw";
 };
 
 /** Sent only to the opponent, and only for a power that actually succeeded:

@@ -5,8 +5,8 @@ import { formatTimeControl } from "../lobby/format";
 import { mountGameBoard, type BoardHandle } from "./board";
 import { openGameConnection, type GameConnection } from "./connection";
 import { EvalBar } from "./EvalBar";
-import { formatEvaluation } from "./evaluation";
-import { BoardIcon, HomeIcon, ThumbsDownIcon, ThumbsUpIcon } from "./icons";
+import { evaluationForOutcome, formatEvaluation } from "./evaluation";
+import { BoardIcon, CheckIcon, CloseIcon, HomeIcon, ThumbsDownIcon, ThumbsUpIcon } from "./icons";
 import { capturedMaterial, PIECE_GLYPH, type CapturedPiece } from "./material";
 import type { ErrorFrame, PowerUsedFrame, StateFrame } from "./protocol";
 
@@ -45,6 +45,18 @@ const endReasonLabels: Record<string, string> = {
 const powerLabels: Record<PowerID, string> = {
   best_move: "Best move",
   current_eval: "Evaluation",
+  try_move: "Try a move",
+};
+
+/** Display order for the powers panel. Which of these actually render is
+ *  driven by key presence in `charges`, not this list — a game already in
+ *  flight when a power shipped simply has no key for it. */
+const POWER_ORDER: PowerID[] = ["best_move", "current_eval", "try_move"];
+
+const outcomeLabels: Record<"checkmate" | "stalemate" | "draw", string> = {
+  checkmate: "Checkmate",
+  stalemate: "Stalemate",
+  draw: "Draw",
 };
 
 function formatClock(ms: number): string {
@@ -106,8 +118,10 @@ export function GameScreen({
   // The viewer's own remaining charges, seeded from the snapshot and then
   // only ever replaced by the server's own number on a power_used frame —
   // there is no client-side decrementing, and no opponent counts exist here
-  // to render because none are ever sent.
-  const [charges, setCharges] = useState<Record<PowerID, number> | null>(null);
+  // to render because none are ever sent. Partial, not a full Record: a
+  // power a game never had (added after it started) is a missing key, not a
+  // zero — see api/client.ts's own comment on this same shape.
+  const [charges, setCharges] = useState<Partial<Record<PowerID, number>> | null>(null);
   // One power per turn: the ply the viewer last spent a power at, or null.
   // Server state, mirrored — seeded from the snapshot and then only ever set
   // by a power_used frame, so a refused or refunded power never locks a turn
@@ -117,10 +131,28 @@ export function GameScreen({
   const [powerResult, setPowerResult] = useState<PowerUsedFrame | null>(null);
   const [opponentUsedPower, setOpponentUsedPower] = useState(false);
 
+  // try_move's own state machine. armedPower is set the moment the button is
+  // clicked, before anything is sent; candidateUCI/previewOpen track the
+  // request from the moment a drag sends it (previewOpen stays true through
+  // the wait for the engine and through the result, so "back to the current
+  // position" is always available — never only once the answer lands).
+  // tryMovePhase drives the eval bar's before → after sweep (see EvalBar).
+  const [armedPower, setArmedPower] = useState<PowerID | null>(null);
+  const [candidateUCI, setCandidateUCI] = useState<string | null>(null);
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const [tryMovePhase, setTryMovePhase] = useState<"before" | "after">("before");
+
   const boardEl = useRef<HTMLDivElement | null>(null);
   const boardHandle = useRef<BoardHandle | null>(null);
   const connection = useRef<GameConnection | null>(null);
   const noticeTimer = useRef<number | undefined>(undefined);
+  // The command_id of the try_move request currently awaiting an answer, and
+  // — set only if the player hits "back" before it arrives — the command_id
+  // of one to treat as cancelled: its charge and turn lock still land for
+  // real (the engine ran, the spend happened), but no preview reopens for a
+  // candidate nobody is looking at anymore.
+  const pendingCommandRef = useRef<string | null>(null);
+  const cancelledCommandRef = useRef<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -153,6 +185,25 @@ export function GameScreen({
             type: "move",
             command_id: crypto.randomUUID(),
             expected_ply: expectedPly,
+            uci,
+          });
+        }, (uci, expectedPly) => {
+          // A try_move candidate, armed by the powers panel: sent as a power
+          // request rather than a move. previewOpen goes up immediately, not
+          // once the answer lands, so "back to the current position" is
+          // available for the whole wait.
+          const commandID = crypto.randomUUID();
+          pendingCommandRef.current = commandID;
+          setArmedPower(null);
+          setPendingPower("try_move");
+          setPowerResult(null);
+          setPreviewOpen(true);
+          setCandidateUCI(uci);
+          connection.current?.send({
+            type: "use_power",
+            command_id: commandID,
+            expected_ply: expectedPly,
+            power: "try_move",
             uci,
           });
         });
@@ -201,20 +252,62 @@ export function GameScreen({
               setDisplayClocks(frame.clocks);
               setClocksAt(Date.now());
               setWsError(null);
-              // A verdict belongs to the position it was asked about.
+              // A verdict belongs to the position it was asked about. An
+              // authoritative frame always wins over a preview too — the
+              // board's own applyState already tore it down; this is the
+              // React-state half of the same reset (unconditional, since a
+              // handler defined once at mount can't safely read the latest
+              // previewOpen/armedPower to decide whether it's needed).
               setPowerResult(null);
+              setArmedPower(null);
+              setPreviewOpen(false);
+              setCandidateUCI(null);
+              pendingCommandRef.current = null;
+              cancelledCommandRef.current = null;
             },
             onError: (frame: ErrorFrame) => {
               setWsError(frame.message);
               setPendingPower(null);
+              setArmedPower(null);
+              // A refund must snap the board back too, or a refused/refunded
+              // try_move leaves a dead preview on screen. clearPreview is a
+              // no-op when there was nothing to clear.
+              boardHandle.current?.clearPreview();
+              setPreviewOpen(false);
+              setCandidateUCI(null);
+              pendingCommandRef.current = null;
+              cancelledCommandRef.current = null;
             },
             onPowerUsed: (frame: PowerUsedFrame) => {
-              setCharges((previous) => ({ ...(previous ?? { best_move: 0, current_eval: 0 }), [frame.power]: frame.remaining }));
+              if (frame.power === "try_move" && frame.command_id === cancelledCommandRef.current) {
+                // The player already hit "back" before this arrived. The
+                // spend is real either way — apply the bookkeeping — but
+                // nobody is looking at this candidate anymore, so no preview
+                // reopens for it.
+                cancelledCommandRef.current = null;
+                setCharges((previous) => ({ ...(previous ?? {}), [frame.power]: frame.remaining }));
+                setPendingPower(null);
+                setPowerUsedPly(frame.ply);
+                return;
+              }
+
+              setCharges((previous) => ({ ...(previous ?? {}), [frame.power]: frame.remaining }));
               setPendingPower(null);
               setPowerResult(frame);
               setPowerUsedPly(frame.ply);
               if (frame.power === "best_move" && frame.best_move) {
                 boardHandle.current?.showHint(frame.best_move);
+              }
+              if (frame.power === "try_move") {
+                setTryMovePhase("before");
+                boardHandle.current?.showPreview(frame.after_fen ?? "", frame.candidate_uci ?? "");
+                // Two rAFs guarantee an actual paint lands between the
+                // "before" render (instant, no transition — see EvalBar) and
+                // this one, which is what lets the height transition sweep
+                // rather than jump straight to the after reading.
+                requestAnimationFrame(() => {
+                  requestAnimationFrame(() => setTryMovePhase("after"));
+                });
               }
             },
             onPowerNotice: () => {
@@ -224,6 +317,20 @@ export function GameScreen({
             },
             onSessionReplaced: () => {
               setReplaced(true);
+            },
+            onDisconnected: () => {
+              // A reconnect rehydrates nothing on its own, so a preview the
+              // client can no longer vouch for is discarded — the same
+              // "back" the player could have chosen themselves, costing
+              // nothing extra since the charge is already spent either way.
+              boardHandle.current?.clearPreview();
+              boardHandle.current?.armCandidate(false);
+              setPreviewOpen(false);
+              setCandidateUCI(null);
+              setArmedPower(null);
+              pendingCommandRef.current = null;
+              cancelledCommandRef.current = null;
+              setPendingPower((previous) => (previous === "try_move" ? null : previous));
             },
           },
         );
@@ -306,6 +413,14 @@ export function GameScreen({
   }
 
   function usePower(power: PowerID) {
+    if (power === "try_move") {
+      // Arms (or, clicked again, disarms) — nothing is sent and no charge is
+      // touched until a drag actually produces a candidate.
+      const next = armedPower === "try_move" ? null : "try_move";
+      setArmedPower(next);
+      boardHandle.current?.armCandidate(next === "try_move");
+      return;
+    }
     setPendingPower(power);
     setPowerResult(null);
     boardHandle.current?.showHint(null);
@@ -317,28 +432,92 @@ export function GameScreen({
     });
   }
 
-  // The eval bar reads the viewer's own last `current_eval` verdict, and
-  // nothing else: a `best_move` result leaves it where it was, and the next
-  // state frame clears `powerResult` and with it the bar.
-  const evaluation = powerResult?.power === "current_eval" ? powerResult : null;
+  function playPreviewedMove() {
+    if (!tryMoveResult) {
+      return;
+    }
+    // The frame's own ply, not live?.ply: they agree in every case that can
+    // reach this button, but this makes "this move, for the position it was
+    // computed for" explicit, so a hypothetical mismatch fails as stale_ply
+    // instead of silently applying somewhere else. Nothing is changed
+    // locally — the preview already *is* the post-move position, so the
+    // arriving state frame re-renders it authoritatively, real last-move
+    // highlight included.
+    connection.current?.send({
+      type: "move",
+      command_id: crypto.randomUUID(),
+      expected_ply: tryMoveResult.ply,
+      uci: tryMoveResult.candidate_uci ?? "",
+    });
+  }
+
+  function backToPosition() {
+    boardHandle.current?.clearPreview();
+    boardHandle.current?.armCandidate(false);
+    setPreviewOpen(false);
+    setCandidateUCI(null);
+    // Animates the bar back down to the pre-candidate reading — powerResult
+    // is deliberately kept, so the readout stays up for the rest of the turn
+    // (paid for, and the lock means there's no second try to spend it on).
+    setTryMovePhase("before");
+    if (pendingPower === "try_move") {
+      // Still waiting on the engine: mark this request's answer as one to
+      // apply silently rather than reopen a preview for.
+      cancelledCommandRef.current = pendingCommandRef.current;
+    }
+    setPendingPower((previous) => (previous === "try_move" ? null : previous));
+  }
+
+  const tryMoveResult = powerResult?.power === "try_move" ? powerResult : null;
+  // The eval bar reads the viewer's own last verdict: current_eval's single
+  // reading, or try_move's before/after pair driven by tryMovePhase (an
+  // ended candidate becomes a synthetic reading — see evaluationForOutcome).
+  // A best_move result leaves the bar where it was, and the next state frame
+  // clears powerResult and with it the bar either way.
+  const evaluation =
+    powerResult?.power === "current_eval"
+      ? powerResult
+      : tryMoveResult
+        ? tryMovePhase === "before"
+          ? { score_cp: tryMoveResult.score_cp, mate_in: tryMoveResult.mate_in }
+          : tryMoveResult.after_outcome
+            ? evaluationForOutcome(tryMoveResult.after_outcome, viewerColor)
+            : { score_cp: tryMoveResult.after_score_cp, mate_in: tryMoveResult.after_mate_in }
+        : null;
+  // Only the try_move "before" reading is laid out with no transition — see
+  // EvalBar's own doc comment on why that has to be a real, separately
+  // tracked render rather than a value derived at the same instant the
+  // "after" one is set.
+  const evalInstant = tryMoveResult !== null && tryMovePhase === "before";
   const finished = live?.status === "finished" || live?.status === "aborted";
   const playable = live?.status === "pending" || live?.status === "live";
   const material = capturedMaterial(live?.fen ?? "");
   const advantage = viewerColor === "white" ? material.whiteAdvantage : -material.whiteAdvantage;
 
-  // Escape puts the result away, matching the click-outside dismissal below.
+  // Escape backs out of whatever is frontmost: an armed try_move, an open
+  // preview, or — matching the click-outside dismissal below — the result.
   useEffect(() => {
-    if (!finished || resultDismissed) {
-      return;
-    }
     function onKeyDown(event: KeyboardEvent) {
-      if (event.key === "Escape") {
+      if (event.key !== "Escape") {
+        return;
+      }
+      if (armedPower) {
+        setArmedPower(null);
+        boardHandle.current?.armCandidate(false);
+        return;
+      }
+      if (previewOpen) {
+        backToPosition();
+        return;
+      }
+      if (finished && !resultDismissed) {
         setResultDismissed(true);
       }
     }
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [finished, resultDismissed]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [armedPower, previewOpen, finished, resultDismissed]);
 
   return (
     <div className="game-screen">
@@ -403,7 +582,9 @@ export function GameScreen({
             {/* Only for a match that agreed to powers at all — a rail that
                 appeared with the first verdict would resize the board
                 mid-game. */}
-            {game.powers_per_player > 0 && <EvalBar viewerColor={viewerColor} evaluation={evaluation} />}
+            {game.powers_per_player > 0 && (
+              <EvalBar viewerColor={viewerColor} evaluation={evaluation} instant={evalInstant} />
+            )}
           </div>
 
           <PlayerBar
@@ -443,11 +624,16 @@ export function GameScreen({
           {game.powers_per_player > 0 && charges && (
             <PowersPanel
               charges={charges}
+              armedPower={armedPower}
               pending={pendingPower}
+              previewOpen={previewOpen}
+              candidateUCI={candidateUCI}
               result={powerResult}
               yourTurn={playable === true && live?.turn === viewerColor}
               usedThisTurn={live !== null && powerUsedPly === live.ply}
               onUse={usePower}
+              onPlay={playPreviewedMove}
+              onBack={backToPosition}
             />
           )}
 
@@ -732,23 +918,42 @@ function PlayerBar({
  *  because nothing about it is ever sent. */
 function PowersPanel({
   charges,
+  armedPower,
   pending,
+  previewOpen,
+  candidateUCI,
   result,
   yourTurn,
   usedThisTurn,
   onUse,
+  onPlay,
+  onBack,
 }: {
-  charges: Record<PowerID, number>;
+  charges: Partial<Record<PowerID, number>>;
+  /** Which power is armed and waiting for a drag — try_move only, but kept
+   *  general the way `pending` already is. */
+  armedPower: PowerID | null;
   pending: PowerID | null;
+  /** True from the moment a try_move candidate is sent until it is played or
+   *  discarded — spans both the wait for the engine and the result, since
+   *  "back to the current position" is offered for the whole span. */
+  previewOpen: boolean;
+  candidateUCI: string | null;
   result: PowerUsedFrame | null;
   yourTurn: boolean;
   /** One power per turn, whichever power it is — the server refuses a second
    *  one at the same ply, so the panel does not offer it. */
   usedThisTurn: boolean;
   onUse: (power: PowerID) => void;
+  onPlay: () => void;
+  onBack: () => void;
 }) {
-  const powers: PowerID[] = ["best_move", "current_eval"];
-  const enabled = yourTurn && !usedThisTurn;
+  // Which powers to show is decided by key presence in charges, not this
+  // fixed list — a game already in flight when a power shipped has no key
+  // for it at all, and that is a different thing from having spent it all.
+  const powers = POWER_ORDER.filter((power) => charges[power] !== undefined);
+  const enabled = yourTurn && !usedThisTurn && !previewOpen;
+  const tryMoveResult = result?.power === "try_move" ? result : null;
 
   return (
     <div className="powers-panel">
@@ -756,24 +961,23 @@ function PowersPanel({
       <div className="power-buttons">
         {powers.map((power) => {
           const remaining = charges[power] ?? 0;
+          const armed = armedPower === power;
           return (
             <button
               key={power}
               type="button"
-              className="choice"
+              className={armed ? "choice active" : "choice"}
               disabled={!enabled || remaining <= 0 || pending !== null}
               onClick={() => onUse(power)}
             >
               <strong>{powerLabels[power]}</strong>
-              <span>
-                {pending === power ? "Thinking…" : `${remaining} left`}
-              </span>
+              <span>{pending === power ? "Thinking…" : armed ? "Drag a move to try it" : `${remaining} left`}</span>
             </button>
           );
         })}
       </div>
 
-      {result && (
+      {result && result.power !== "try_move" && (
         <p className="power-result" role="status">
           {result.power === "best_move" ? (
             <>
@@ -786,8 +990,53 @@ function PowersPanel({
           )}
         </p>
       )}
+
+      {previewOpen &&
+        (tryMoveResult ? (
+          <div className="try-move-preview">
+            <p className="power-result" role="status">
+              <strong>{formatEvaluation(tryMoveResult)}</strong>
+              {" → "}
+              <strong>
+                {tryMoveResult.after_outcome
+                  ? outcomeLabels[tryMoveResult.after_outcome]
+                  : formatEvaluation({ score_cp: tryMoveResult.after_score_cp, mate_in: tryMoveResult.after_mate_in })}
+              </strong>
+              {!tryMoveResult.after_outcome && " for White"}
+            </p>
+            <div className="modal-actions">
+              <button
+                type="button"
+                className="icon-button small primary"
+                title="Play this move"
+                aria-label="Play this move"
+                onClick={onPlay}
+              >
+                <CheckIcon />
+              </button>
+              <button
+                type="button"
+                className="icon-button small"
+                title="Back to the current position"
+                aria-label="Back to the current position"
+                onClick={onBack}
+              >
+                <CloseIcon />
+              </button>
+            </div>
+            <p className="hint action-caption">Play this move · back to the current position</p>
+          </div>
+        ) : (
+          <p className="try-move-preview hint" role="status">
+            Thinking about {candidateUCI}…{" "}
+            <button type="button" className="ghost" onClick={onBack}>
+              Back
+            </button>
+          </p>
+        ))}
+
       {!yourTurn && <p className="hint">Powers can only be used on your own turn.</p>}
-      {yourTurn && usedThisTurn && <p className="hint">One power per turn — make your move.</p>}
+      {yourTurn && usedThisTurn && !previewOpen && <p className="hint">One power per turn — make your move.</p>}
     </div>
   );
 }

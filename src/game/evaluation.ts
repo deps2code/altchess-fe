@@ -54,3 +54,18 @@ export function whiteShare(frame: Evaluation): number {
   const chances = 2 / (1 + Math.exp(-0.00368208 * frame.score_cp)) - 1;
   return Math.min(0.985, Math.max(0.015, (chances + 1) / 2));
 }
+
+/** A synthetic reading for a try_move candidate that ends the game — there is
+ *  no eval to search, only an outcome, but the eval bar still needs
+ *  something to show. A power is only ever usable on the mover's own turn,
+ *  so a mating candidate always mates for the viewer; stalemate and every
+ *  other draw favour neither side. */
+export function evaluationForOutcome(
+  outcome: "checkmate" | "stalemate" | "draw",
+  viewerColor: "white" | "black",
+): Evaluation {
+  if (outcome === "checkmate") {
+    return { mate_in: viewerColor === "white" ? 1 : -1, score_cp: undefined };
+  }
+  return { score_cp: 0, mate_in: undefined };
+}

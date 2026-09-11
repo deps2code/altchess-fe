@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { ApiError, api, type Game, type PlayerColor, type User } from "../api/client";
 import { useAuth } from "../auth/AuthProvider";
-import { BulbIcon, ChipIcon, ClockIcon, GaugeIcon, PersonIcon, TrendIcon } from "../game/icons";
+import { BulbIcon, ChipIcon, ClockIcon, FlaskIcon, GaugeIcon, PersonIcon, TrendIcon } from "../game/icons";
 import { useBots } from "../hooks/useBots";
 import { usePowers } from "../hooks/usePowers";
 import { formatPowers, formatTimeControl } from "./format";
@@ -155,7 +155,7 @@ export function Lobby({ user, onOpenGame }: { user: User; onOpenGame: (gameID: s
                   "plain chess"
                 ) : (
                   <>
-                    {chosenPowers}× <BulbIcon /> <GaugeIcon />
+                    {chosenPowers}× <BulbIcon /> <GaugeIcon /> <FlaskIcon />
                   </>
                 )}
               </span>
@@ -279,6 +279,9 @@ export function Lobby({ user, onOpenGame }: { user: User; onOpenGame: (gameID: s
                 </span>
                 <span className="power-chip" title="Evaluation" aria-label={`Evaluation: ${chosenPowers} per player`}>
                   <GaugeIcon /> <b>×{chosenPowers}</b>
+                </span>
+                <span className="power-chip" title="Try a move" aria-label={`Try a move: ${chosenPowers} per player`}>
+                  <FlaskIcon /> <b>×{chosenPowers}</b>
                 </span>
               </span>
             </div>

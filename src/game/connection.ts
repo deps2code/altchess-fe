@@ -36,6 +36,12 @@ export function openGameConnection(
     onPowerUsed?: (frame: PowerUsedFrame) => void;
     onPowerNotice?: (frame: PowerNoticeFrame) => void;
     onSessionReplaced?: () => void;
+    /** Fires on any drop that will attempt to reconnect (never on the
+     *  session-replaced close, which doesn't). A reconnect rehydrates
+     *  nothing on its own — the next snapshot read does that — so this is
+     *  the signal that whatever the UI was showing about the live position
+     *  (a try_move preview, in particular) can no longer be vouched for. */
+    onDisconnected?: () => void;
   },
 ): GameConnection {
   let closed = false;
@@ -113,6 +119,7 @@ export function openGameConnection(
         handlers.onSessionReplaced?.();
         return;
       }
+      handlers.onDisconnected?.();
       scheduleReconnect();
     };
 

@@ -1,4 +1,4 @@
-export type PowerID = "best_move" | "current_eval";
+export type PowerID = "best_move" | "current_eval" | "try_move";
 
 export type Power = {
   id: PowerID;
@@ -185,7 +185,13 @@ export type GameSnapshot = {
    *  for a waiting invite. */
   powers?: {
     per_player: number;
-    remaining: Record<PowerID, number>;
+    /** Partial, not a full Record: a power added after a game started is
+     *  simply missing from this map rather than defaulting to 0 or to
+     *  unlimited — the server never backfills a charge of a new power into
+     *  a game already in flight. Read with `charges[power] ?? 0` and treat
+     *  key presence (not just the count) as "does this game have this
+     *  power at all". */
+    remaining: Partial<Record<PowerID, number>>;
     /** Whether the caller has already spent their one power for the current
      *  ply — one power per turn, whichever power it is. Rehydrates the
      *  disabled state after a reload; the server enforces it regardless. */

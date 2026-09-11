@@ -47,15 +47,6 @@ const powerLabels: Record<PowerID, string> = {
   current_eval: "Evaluation",
 };
 
-/** A signed rating delta plus the rating it lands on, e.g. "1523 (+8)". */
-function ratingCell(baseRating: number, change: number | undefined): string {
-  if (change === undefined) {
-    return `${baseRating}`;
-  }
-  const sign = change > 0 ? "+" : "";
-  return `${baseRating + change} (${sign}${change})`;
-}
-
 function formatClock(ms: number): string {
   const totalSeconds = Math.max(0, Math.round(ms / 1000));
   const minutes = Math.floor(totalSeconds / 60);
@@ -525,16 +516,27 @@ export function GameScreen({
                   {live.result && live.result !== "draw" && `${live.result === "white" ? "White" : "Black"} · `}
                   {endReasonLabels[live.endReason ?? ""] ?? "Game over"}
                 </p>
-                <dl>
-                  <div>
-                    <dt>{game.white.display_name} · White</dt>
-                    <dd>{ratingCell(game.white.rating, live.whiteRatingChange)}</dd>
-                  </div>
-                  <div>
-                    <dt>{game.black.display_name} · Black</dt>
-                    <dd>{ratingCell(game.black.rating, live.blackRatingChange)}</dd>
-                  </div>
-                </dl>
+                {/* A scorecard rather than the page's generic <dl> stats row:
+                    that one lays out left-aligned and wraps to two ragged
+                    lines inside a modal this narrow, which reads as a mistake
+                    next to everything else here being centred. */}
+                <div className="result-scores">
+                  <ResultScore
+                    player={game.white}
+                    side="White"
+                    change={live.whiteRatingChange}
+                    won={live.result === "white"}
+                  />
+                  <ResultScore
+                    player={game.black}
+                    side="Black"
+                    change={live.blackRatingChange}
+                    won={live.result === "black"}
+                  />
+                </div>
+                {/* A bot game is never rated, so neither side has a delta to
+                    show; say so once rather than twice in the columns. */}
+                {game.bot_level != null && <p className="hint result-note">Unrated · you played the engine</p>}
               </>
             )}
             {/* Icon-only and side by side: leave, or stay and look at the
@@ -652,6 +654,35 @@ export function GameScreen({
             </button>
           </div>
         </div>
+      )}
+    </div>
+  );
+}
+
+/** One column of the result modal's scorecard: who played that side, the
+ *  rating they end the game on, and the delta that got them there. The delta
+ *  is absent for a game that was never rated (a bot game), where the rating
+ *  shown is simply the one that side came in with. */
+function ResultScore({
+  player,
+  side,
+  change,
+  won,
+}: {
+  player: PublicUser;
+  side: "White" | "Black";
+  change: number | undefined;
+  won: boolean;
+}) {
+  return (
+    <div className={won ? "result-score won" : "result-score"}>
+      <p className="result-side">{side}</p>
+      <p className="result-player">{player.display_name}</p>
+      <p className="result-rating">{player.rating + (change ?? 0)}</p>
+      {change !== undefined && (
+        <p className={change > 0 ? "result-change up" : change < 0 ? "result-change down" : "result-change"}>
+          {change > 0 ? `+${change}` : change < 0 ? `−${Math.abs(change)}` : "±0"}
+        </p>
       )}
     </div>
   );

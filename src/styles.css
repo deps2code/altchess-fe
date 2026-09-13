@@ -246,12 +246,66 @@ dd { margin: .4rem 0 0; font-family: Georgia, serif; font-size: 1.75rem; }
 .power-toast { position: absolute; top: 1rem; left: 50%; transform: translateX(-50%); margin: 0; padding: .5rem .9rem; border: 1px solid #d6a94b55; background: #1e1d17ee; color: #ece8dd; font-size: .78rem; letter-spacing: .04em; }
 .board-column { position: relative; }
 
+/* Mobile powers picker: hidden by default, since the aside's own panel
+   already covers this above the breakpoint below. Bright fill plus a layered
+   glow (rather than the app's usual thin outline) is deliberate here — every
+   other control on this screen is dim by design, and this is the one button
+   that has to read as "tap me" at a glance on a small screen. */
+.powers-fab {
+  display: none;
+  position: fixed;
+  right: 1.1rem;
+  bottom: 1.1rem;
+  z-index: 55;
+  width: 3.5rem;
+  height: 3.5rem;
+  border: 2px solid #ffe08a;
+  color: #171611;
+  background: #ffd876;
+  box-shadow: 0 0 .5rem #ffd876dd, 0 0 1.5rem #ffd87699, 0 0 2.75rem #d6a94b66;
+}
+.powers-fab svg { width: 1.6rem; height: 1.6rem; }
+.powers-fab:hover { color: #171611; background: #fff0b8; border-color: #fff0b8; box-shadow: 0 0 .6rem #fff0b8ee, 0 0 1.75rem #ffd876bb, 0 0 3rem #d6a94b77; }
+.powers-modal { width: min(19rem, 100%); }
+.powers-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: .6rem; margin-top: .25rem; }
+.power-tile { position: relative; width: 100%; aspect-ratio: 1; border-radius: .7rem; }
+.power-tile svg { width: 1.5rem; height: 1.5rem; }
+.power-tile-count { position: absolute; right: .3rem; bottom: .2rem; min-width: 1.1rem; padding: 0 .3rem; border-radius: 999px; background: #14181dcc; color: #d6a94b; font-size: .65rem; font-weight: 700; line-height: 1.3; }
+
+/* Mobile-only floating bars anchored below the board: a reminder while
+   try_move is armed and waiting for a drag, and — once the candidate's
+   answer lands — the eval change plus the accept/discard pair. Only one is
+   ever shown at a time (arming clears once a candidate is sent), so both
+   share the same fixed spot. */
+.try-move-hint-bar,
+.try-move-confirm-bar {
+  display: none;
+  position: fixed;
+  left: 50%;
+  bottom: 1.1rem;
+  transform: translateX(-50%);
+  z-index: 55;
+  padding: .55rem .9rem;
+  border: 1px solid #d6a94b55;
+  border-radius: 1rem;
+  background: #1e1d17ee;
+  box-shadow: 0 .5rem 1.5rem #00000055;
+}
+.try-move-hint-bar { align-items: center; gap: .5rem; border-radius: 999px; color: #d6a94b; font-size: .82rem; white-space: nowrap; }
+.try-move-hint-bar svg { width: 1.1rem; height: 1.1rem; }
+.try-move-confirm-bar { flex-direction: column; align-items: center; gap: .5rem; }
+.try-move-confirm-eval { margin: 0; color: #ece8dd; font-size: .82rem; white-space: nowrap; }
+.try-move-confirm-eval strong { color: #d6a94b; font-family: Georgia, serif; }
+.try-move-confirm-actions { display: flex; align-items: center; gap: .6rem; }
+
 @media (max-width: 900px) {
   .hero.split, .hero.photo, .lobby { grid-template-columns: 1fr; }
   .hero.photo { min-height: auto; align-items: start; gap: 2.5rem; }
   .lobby { padding-inline: 1.25rem; }
   .status { display: inline-flex; align-items: center; font-size: .68rem; }
   .board-stage { grid-template-columns: 1fr; padding-inline: 1.25rem; }
+  .powers-fab { display: inline-flex; }
+  .try-move-hint-bar, .try-move-confirm-bar { display: flex; }
 }
 
 @media (prefers-reduced-motion: no-preference) {

@@ -140,12 +140,6 @@ export function Lobby({ user, onOpenGame }: { user: User; onOpenGame: (gameID: s
             <h3>New game</h3>
             <p className="selector-summary">
               <TrendIcon />
-              {playingComputer && chosenBot && (
-                <>
-                  <span>{chosenBot.name}</span>
-                  <span aria-hidden="true">·</span>
-                </>
-              )}
               <span>{formatTimeControl(chosen.initial, chosen.increment)}</span>
               <span aria-hidden="true">·</span>
               <span>as {color}</span>
@@ -273,17 +267,6 @@ export function Lobby({ user, onOpenGame }: { user: User; onOpenGame: (gameID: s
           <div className="field">
             <div className="field-head">
               <span className="field-label">Powers</span>
-              <span className="power-chips">
-                <span className="power-chip" title="Best move" aria-label={`Best move: ${chosenPowers} per player`}>
-                  <BulbIcon /> <b>×{chosenPowers}</b>
-                </span>
-                <span className="power-chip" title="Evaluation" aria-label={`Evaluation: ${chosenPowers} per player`}>
-                  <GaugeIcon /> <b>×{chosenPowers}</b>
-                </span>
-                <span className="power-chip" title="Try a move" aria-label={`Try a move: ${chosenPowers} per player`}>
-                  <FlaskIcon /> <b>×{chosenPowers}</b>
-                </span>
-              </span>
             </div>
 
             <div className="count-row" role="group" aria-label="Charges of each power, per player">

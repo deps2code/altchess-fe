@@ -127,6 +127,16 @@ export function ClockIcon(props: IconProps) {
   );
 }
 
+/** Opens the mobile powers picker — a generic "powers" mark distinct from
+ *  the three power icons themselves. */
+export function BoltIcon(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <path d="M13 3 5 13.5h5.5L10 21l8-10.5h-5.5z" />
+    </Svg>
+  );
+}
+
 /** The two opponent kinds in the lobby's first row: a person to invite, or
  *  the engine to play. */
 export function PersonIcon(props: IconProps) {

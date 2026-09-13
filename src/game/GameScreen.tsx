@@ -6,7 +6,18 @@ import { mountGameBoard, type BoardHandle } from "./board";
 import { openGameConnection, type GameConnection } from "./connection";
 import { EvalBar } from "./EvalBar";
 import { evaluationForOutcome, formatEvaluation } from "./evaluation";
-import { BoardIcon, CheckIcon, CloseIcon, HomeIcon, ThumbsDownIcon, ThumbsUpIcon } from "./icons";
+import {
+  BoardIcon,
+  BoltIcon,
+  BulbIcon,
+  CheckIcon,
+  CloseIcon,
+  FlaskIcon,
+  GaugeIcon,
+  HomeIcon,
+  ThumbsDownIcon,
+  ThumbsUpIcon,
+} from "./icons";
 import { capturedMaterial, PIECE_GLYPH, type CapturedPiece } from "./material";
 import type { ErrorFrame, PowerUsedFrame, StateFrame } from "./protocol";
 
@@ -52,6 +63,14 @@ const powerLabels: Record<PowerID, string> = {
  *  driven by key presence in `charges`, not this list — a game already in
  *  flight when a power shipped simply has no key for it. */
 const POWER_ORDER: PowerID[] = ["best_move", "current_eval", "try_move"];
+
+/** Icon-only mark for each power, used by the mobile picker's 3-wide grid —
+ *  same lamp/dial/flask mapping as the aside's own copy. */
+const POWER_ICONS: Record<PowerID, typeof BulbIcon> = {
+  best_move: BulbIcon,
+  current_eval: GaugeIcon,
+  try_move: FlaskIcon,
+};
 
 const outcomeLabels: Record<"checkmate" | "stalemate" | "draw", string> = {
   checkmate: "Checkmate",
@@ -130,6 +149,11 @@ export function GameScreen({
   const [pendingPower, setPendingPower] = useState<PowerID | null>(null);
   const [powerResult, setPowerResult] = useState<PowerUsedFrame | null>(null);
   const [opponentUsedPower, setOpponentUsedPower] = useState(false);
+  // Mobile-only: the aside's powers panel can scroll out of view on a narrow
+  // screen, so a floating button opens the same choices as a small overlay
+  // instead. Picking one closes it immediately — for try_move that's the
+  // moment it arms, for the other two it's the moment the request is sent.
+  const [powersModalOpen, setPowersModalOpen] = useState(false);
 
   // try_move's own state machine. armedPower is set the moment the button is
   // clicked, before anything is sent; candidateUCI/previewOpen track the
@@ -493,6 +517,11 @@ export function GameScreen({
   const playable = live?.status === "pending" || live?.status === "live";
   const material = capturedMaterial(live?.fen ?? "");
   const advantage = viewerColor === "white" ? material.whiteAdvantage : -material.whiteAdvantage;
+  const yourTurn = playable === true && live?.turn === viewerColor;
+  const usedThisTurn = live !== null && powerUsedPly === live.ply;
+  // Same key-presence filter the aside panel uses — a game already in flight
+  // when a power shipped simply has no key for it.
+  const availablePowers = charges ? POWER_ORDER.filter((power) => charges[power] !== undefined) : [];
 
   // Escape backs out of whatever is frontmost: an armed try_move, an open
   // preview, or — matching the click-outside dismissal below — the result.
@@ -629,8 +658,8 @@ export function GameScreen({
               previewOpen={previewOpen}
               candidateUCI={candidateUCI}
               result={powerResult}
-              yourTurn={playable === true && live?.turn === viewerColor}
-              usedThisTurn={live !== null && powerUsedPly === live.ply}
+              yourTurn={yourTurn}
+              usedThisTurn={usedThisTurn}
               onUse={usePower}
               onPlay={playPreviewedMove}
               onBack={backToPosition}
@@ -644,6 +673,119 @@ export function GameScreen({
           )}
         </aside>
       </div>
+
+      {/* Mobile-only: the aside above can end up scrolled out of view on a
+          narrow screen, so this floating button opens the same power choices
+          as a small overlay instead. Hidden by CSS above the same breakpoint
+          the aside already stacks at. */}
+      {game.powers_per_player > 0 && charges && (
+        <button
+          type="button"
+          className="icon-button powers-fab"
+          title="Powers"
+          aria-label="Open your powers"
+          onClick={() => setPowersModalOpen(true)}
+        >
+          <BoltIcon />
+        </button>
+      )}
+
+      {powersModalOpen && charges && (
+        <div
+          className="modal-backdrop soft"
+          onClick={(event) => {
+            if (event.target === event.currentTarget) {
+              setPowersModalOpen(false);
+            }
+          }}
+        >
+          <div className="modal soft powers-modal" role="dialog" aria-modal="true" aria-labelledby="powers-modal-heading">
+            <button type="button" className="modal-close" aria-label="Close" onClick={() => setPowersModalOpen(false)}>
+              <span aria-hidden="true">×</span>
+            </button>
+            <p id="powers-modal-heading" className="section-number">
+              Your powers
+            </p>
+            <div className="powers-grid">
+              {availablePowers.map((power) => {
+                const Icon = POWER_ICONS[power];
+                const remaining = charges[power] ?? 0;
+                return (
+                  <button
+                    key={power}
+                    type="button"
+                    className={armedPower === power ? "icon-button power-tile active" : "icon-button power-tile"}
+                    disabled={!yourTurn || usedThisTurn || previewOpen || remaining <= 0 || pendingPower !== null}
+                    title={`${powerLabels[power]} — ${remaining} left`}
+                    aria-label={`${powerLabels[power]} — ${remaining} left`}
+                    onClick={() => {
+                      // Closes right away — for try_move that's the moment it
+                      // arms (the board itself needs to be visible for the
+                      // drag), for the other two it's the moment the request
+                      // is sent.
+                      usePower(power);
+                      setPowersModalOpen(false);
+                    }}
+                  >
+                    <Icon />
+                    <span className="power-tile-count" aria-hidden="true">
+                      {remaining}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Mobile-only: mirrors the aside's own "Drag a move to try it" label,
+          which sits inside the powers panel and is what the FAB modal closes
+          to reveal — but on a narrow screen that panel is scrolled away, so
+          this floating reminder stays visible right below the board instead. */}
+      {armedPower === "try_move" && !previewOpen && (
+        <div className="try-move-hint-bar" role="status">
+          <FlaskIcon />
+          <span>Drag a move to try it</span>
+        </div>
+      )}
+
+      {/* Mobile-only companion to the aside's own try-move confirm pair (same
+          eval readout, same actions) — fixed to the bottom of the screen so
+          both are visible without scrolling back up to the aside. */}
+      {tryMoveResult && previewOpen && (
+        <div className="try-move-confirm-bar" role="dialog" aria-modal="true" aria-label="Play the previewed move?">
+          <p className="try-move-confirm-eval">
+            <strong>{formatEvaluation(tryMoveResult)}</strong>
+            {" → "}
+            <strong>
+              {tryMoveResult.after_outcome
+                ? outcomeLabels[tryMoveResult.after_outcome]
+                : formatEvaluation({ score_cp: tryMoveResult.after_score_cp, mate_in: tryMoveResult.after_mate_in })}
+            </strong>
+          </p>
+          <div className="try-move-confirm-actions">
+            <button
+              type="button"
+              className="icon-button small primary"
+              title="Play this move"
+              aria-label="Play this move"
+              onClick={playPreviewedMove}
+            >
+              <CheckIcon />
+            </button>
+            <button
+              type="button"
+              className="icon-button small"
+              title="Back to the current position"
+              aria-label="Back to the current position"
+              onClick={backToPosition}
+            >
+              <CloseIcon />
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* If the game ended while this session was displaced, the result is
           the thing worth showing — there is nothing left to take back. */}

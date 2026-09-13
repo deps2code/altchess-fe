@@ -85,10 +85,11 @@ export function ThumbsDownIcon(props: IconProps) {
   );
 }
 
-/** The three powers, as marks rather than words: a lamp for `best_move` (the
- *  engine's suggestion), a dial for `current_eval` (its verdict), and a
- *  flask for `try_move` (try it and see). Used wherever a budget is shown as
- *  a count of charges rather than named. */
+/** The four powers, as marks rather than words: a lamp for `best_move` (the
+ *  engine's suggestion), a dial for `current_eval` (its verdict), a flask for
+ *  `try_move` (try it and see), and a crosshair for `motive` (best move,
+ *  threat, and attack in one). Used wherever a budget is shown as a count of
+ *  charges rather than named. */
 export function BulbIcon(props: IconProps) {
   return (
     <Svg {...props}>
@@ -114,6 +115,16 @@ export function FlaskIcon(props: IconProps) {
       <path d="M9 3h6" />
       <path d="M10 3v6.5L4.8 18a2 2 0 0 0 1.7 3h11a2 2 0 0 0 1.7-3L14 9.5V3" />
       <path d="M7.5 15h9" />
+    </Svg>
+  );
+}
+
+export function CrosshairIcon(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <circle cx="12" cy="12" r="8" />
+      <circle cx="12" cy="12" r="2.5" />
+      <path d="M12 2v4M12 18v4M2 12h4M18 12h4" />
     </Svg>
   );
 }

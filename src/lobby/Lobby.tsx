@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { ApiError, api, type Game, type PlayerColor, type User } from "../api/client";
 import { useAuth } from "../auth/AuthProvider";
-import { BulbIcon, ChipIcon, ClockIcon, FlaskIcon, GaugeIcon, PersonIcon, TrendIcon } from "../game/icons";
+import { BulbIcon, ChipIcon, ClockIcon, CrosshairIcon, FlaskIcon, GaugeIcon, PersonIcon, TrendIcon } from "../game/icons";
 import { useBots } from "../hooks/useBots";
 import { usePowers } from "../hooks/usePowers";
 import { formatPowers, formatTimeControl } from "./format";
@@ -149,7 +149,7 @@ export function Lobby({ user, onOpenGame }: { user: User; onOpenGame: (gameID: s
                   "plain chess"
                 ) : (
                   <>
-                    {chosenPowers}× <BulbIcon /> <GaugeIcon /> <FlaskIcon />
+                    {chosenPowers}× <BulbIcon /> <GaugeIcon /> <FlaskIcon /> <CrosshairIcon />
                   </>
                 )}
               </span>

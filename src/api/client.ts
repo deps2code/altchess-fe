@@ -1,4 +1,4 @@
-export type PowerID = "best_move" | "current_eval" | "try_move";
+export type PowerID = "best_move" | "current_eval" | "try_move" | "motive";
 
 export type Power = {
   id: PowerID;

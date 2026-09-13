@@ -12,6 +12,7 @@ import {
   BulbIcon,
   CheckIcon,
   CloseIcon,
+  CrosshairIcon,
   FlaskIcon,
   GaugeIcon,
   HomeIcon,
@@ -57,19 +58,21 @@ const powerLabels: Record<PowerID, string> = {
   best_move: "Best move",
   current_eval: "Evaluation",
   try_move: "Try a move",
+  motive: "Motive",
 };
 
 /** Display order for the powers panel. Which of these actually render is
  *  driven by key presence in `charges`, not this list — a game already in
  *  flight when a power shipped simply has no key for it. */
-const POWER_ORDER: PowerID[] = ["best_move", "current_eval", "try_move"];
+const POWER_ORDER: PowerID[] = ["best_move", "current_eval", "try_move", "motive"];
 
-/** Icon-only mark for each power, used by the mobile picker's 3-wide grid —
- *  same lamp/dial/flask mapping as the aside's own copy. */
+/** Icon-only mark for each power, used by the mobile picker's grid — same
+ *  lamp/dial/flask/crosshair mapping as the aside's own copy. */
 const POWER_ICONS: Record<PowerID, typeof BulbIcon> = {
   best_move: BulbIcon,
   current_eval: GaugeIcon,
   try_move: FlaskIcon,
+  motive: CrosshairIcon,
 };
 
 const outcomeLabels: Record<"checkmate" | "stalemate" | "draw", string> = {
@@ -321,6 +324,13 @@ export function GameScreen({
               setPowerUsedPly(frame.ply);
               if (frame.power === "best_move" && frame.best_move) {
                 boardHandle.current?.showHint(frame.best_move);
+              }
+              if (frame.power === "motive") {
+                boardHandle.current?.showMotive(
+                  frame.best_move ?? null,
+                  frame.threat_move ?? null,
+                  frame.attacked_squares ?? [],
+                );
               }
               if (frame.power === "try_move") {
                 setTryMovePhase("before");
@@ -1125,9 +1135,21 @@ function PowersPanel({
             <>
               Play <strong>{result.best_move}</strong>
             </>
-          ) : (
+          ) : result.power === "current_eval" ? (
             <>
               <strong>{formatEvaluation(result)}</strong> for White
+            </>
+          ) : (
+            <>
+              Play <strong>{result.best_move}</strong>
+              {result.threat_move && (
+                <>
+                  , else <strong>{result.threat_move}</strong>
+                </>
+              )}
+              {result.attacked_squares && result.attacked_squares.length > 0 && (
+                <> — attacks {result.attacked_squares.join(", ")}</>
+              )}
             </>
           )}
         </p>

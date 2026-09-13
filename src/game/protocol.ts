@@ -40,7 +40,12 @@ export type StateFrame = {
  *  position it leads to, and either its eval (`after_score_cp`/
  *  `after_mate_in`) or, when the candidate ends the game, `after_outcome`
  *  instead (never both — a mate score alone can't say who mated whom for an
- *  already-decided position). */
+ *  already-decided position).
+ *
+ *  `threat_move`/`attacked_squares` are motive only: `threat_move` is the
+ *  opponent's best reply if the mover had passed, omitted when the mover was
+ *  in check; `attacked_squares` is every enemy-occupied square `best_move`
+ *  newly attacks, plural for a fork. */
 export type PowerUsedFrame = {
   type: "power_used";
   command_id: string;
@@ -56,6 +61,8 @@ export type PowerUsedFrame = {
   after_score_cp?: number;
   after_mate_in?: number;
   after_outcome?: "checkmate" | "stalemate" | "draw";
+  threat_move?: string;
+  attacked_squares?: string[];
 };
 
 /** Sent only to the opponent, and only for a power that actually succeeded:

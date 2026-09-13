@@ -43,6 +43,13 @@ export type BoardHandle = {
    *  hint is private to this viewer — it is drawn from a frame only they
    *  received — and is cleared by the next authoritative state. */
   showHint: (uci: string | null) => void;
+  /** Draws motive's three markers at once: a green arrow for the best move,
+   *  a red circle on the opponent's threatened reply's destination square,
+   *  and a blue circle on every square the best move newly attacks (plural
+   *  for a fork). Replaces showHint for this power — setAutoShapes replaces
+   *  the whole shape array each call, so the two can't be composed. Cleared
+   *  the same way showHint is: by the next authoritative state. */
+  showMotive: (bestMoveUci: string | null, threatMoveUci: string | null, attackedSquares: string[]) => void;
   /** Arms (or disarms) candidate capture for try_move: while armed, the next
    *  legal drag is reported to onCandidate instead of being played, and
    *  consumes the arm. Unarmed board behaviour (a drag plays a move) is
@@ -139,6 +146,24 @@ export function mountGameBoard(
     api.setAutoShapes(keys ? [{ orig: keys[0], dest: keys[1], brush: "green" }] : []);
   }
 
+  function showMotive(bestMoveUci: string | null, threatMoveUci: string | null, attackedSquares: string[]) {
+    const shapes: Parameters<Api["setAutoShapes"]>[0] = [];
+    const bestKeys = moveKeys(bestMoveUci ?? undefined);
+    if (bestKeys) {
+      shapes.push({ orig: bestKeys[0], dest: bestKeys[1], brush: "green" });
+    }
+    const threatKeys = moveKeys(threatMoveUci ?? undefined);
+    if (threatKeys) {
+      // dest omitted on purpose: chessground draws a circle rather than an
+      // arrow when orig and dest are the same/dest is unset.
+      shapes.push({ orig: threatKeys[1], brush: "red" });
+    }
+    for (const square of attackedSquares) {
+      shapes.push({ orig: square as Key, brush: "blue" });
+    }
+    api.setAutoShapes(shapes);
+  }
+
   function render(update: BoardStateUpdate) {
     ply = update.ply;
     chess = chessFromFen(update.fen);
@@ -167,6 +192,7 @@ export function mountGameBoard(
       render(update);
     },
     showHint,
+    showMotive,
     armCandidate(next) {
       armed = next;
     },

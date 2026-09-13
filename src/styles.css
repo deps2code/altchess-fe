@@ -267,7 +267,7 @@ dd { margin: .4rem 0 0; font-family: Georgia, serif; font-size: 1.75rem; }
 .powers-fab svg { width: 1.6rem; height: 1.6rem; }
 .powers-fab:hover { color: #171611; background: #fff0b8; border-color: #fff0b8; box-shadow: 0 0 .6rem #fff0b8ee, 0 0 1.75rem #ffd876bb, 0 0 3rem #d6a94b77; }
 .powers-modal { width: min(19rem, 100%); }
-.powers-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: .6rem; margin-top: .25rem; }
+.powers-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: .6rem; margin-top: .25rem; }
 .power-tile { position: relative; width: 100%; aspect-ratio: 1; border-radius: .7rem; }
 .power-tile svg { width: 1.5rem; height: 1.5rem; }
 .power-tile-count { position: absolute; right: .3rem; bottom: .2rem; min-width: 1.1rem; padding: 0 .3rem; border-radius: 999px; background: #14181dcc; color: #d6a94b; font-size: .65rem; font-weight: 700; line-height: 1.3; }

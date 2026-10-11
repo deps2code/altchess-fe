@@ -4,6 +4,7 @@ import { AuthPanel } from "../auth/AuthPanel";
 import { useAuth } from "../auth/AuthProvider";
 import { GameLink } from "../game/GameLink";
 import { Lobby } from "../lobby/Lobby";
+import { CookieNotice } from "./CookieNotice";
 
 export function App() {
   const { state, signOut } = useAuth();
@@ -118,6 +119,8 @@ export function App() {
           ))}
         </div>
       </section>
+
+      <CookieNotice />
     </main>
   );
 }

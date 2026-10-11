@@ -415,3 +415,17 @@ dd { margin: .4rem 0 0; font-family: Georgia, serif; font-size: 1.75rem; }
 @keyframes eval-pop {
   from { opacity: 0; transform: translateY(-.3rem); }
 }
+
+/* Browser-storage notice: a dimmed page with the notice centred near the
+   bottom. The backdrop is pointer-events: none so the page stays usable while
+   it is up, and it sits under every modal (z-index 60), so a result or
+   feedback modal is never covered by it. */
+.cookie-notice-backdrop { position: fixed; inset: 0; z-index: 50; display: flex; align-items: flex-end; justify-content: center; padding: 1.5rem; background: linear-gradient(to top, #0c0e11b3 0%, #0c0e1159 40%, #0c0e1126 100%); pointer-events: none; }
+.cookie-notice { pointer-events: auto; display: flex; align-items: center; gap: 1.25rem; width: min(36rem, 100%); padding: 1rem 1.25rem; border: 1px solid #ffffff26; background: #1e1d17e0; backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); box-shadow: 0 1.5rem 4rem #00000066; }
+.cookie-notice p { margin: 0; color: #b9b4a7; font-size: .85rem; line-height: 1.5; }
+.cookie-notice button.ghost { flex: none; }
+
+@media (max-width: 700px) {
+  .cookie-notice-backdrop { padding: 1rem; }
+  .cookie-notice { flex-direction: column; align-items: stretch; }
+}

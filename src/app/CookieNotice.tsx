@@ -25,7 +25,7 @@ export function CookieNotice() {
     <div className="cookie-notice-backdrop">
       <aside className="cookie-notice" role="region" aria-label="Browser storage notice">
         <p>
-          Altchess keeps one item in your browser: a sign-in token, so you stay signed in between
+          Altchess keeps a ccokie so you stay signed in between
           visits. No tracking, analytics, or advertising cookies.
         </p>
         <button type="button" className="ghost" onClick={dismiss}>

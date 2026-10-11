@@ -13,6 +13,7 @@ export function EvalBar({
   viewerColor,
   evaluation,
   instant = false,
+  sweep = false,
 }: {
   viewerColor: "white" | "black";
   /** null between verdicts — a reading belongs to the position it was asked
@@ -23,9 +24,13 @@ export function EvalBar({
    *  wherever the bar happened to be. try_move uses this for its before →
    *  after sweep: the before reading is painted instantly, then a later
    *  render switches to the after reading with this back at its default, so
-   *  the existing height transition carries it there. Every other caller
+   *  a height transition (the slow one, via `sweep`) carries it there. Every other caller
    *  leaves this at its default and keeps the bar's plain cross-fade. */
   instant?: boolean;
+  /** True while try_move's after reading is on screen: the before → after
+   *  travel uses a much slower transition than an ordinary reading, so the
+   *  size and direction of the swing are easy to follow. */
+  sweep?: boolean;
 }) {
   const visible = evaluation !== null;
   const white = evaluation ? whiteShare(evaluation) : 0.5;
@@ -36,6 +41,7 @@ export function EvalBar({
     viewerColor === "white" ? "white-bottom" : "black-bottom",
     visible ? "is-live" : "",
     instant ? "instant" : "",
+    sweep ? "sweep" : "",
   ]
     .filter(Boolean)
     .join(" ");

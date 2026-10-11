@@ -410,6 +410,11 @@ dd { margin: .4rem 0 0; font-family: Georgia, serif; font-size: 1.75rem; }
      specificity than .eval-fill above is what lets this win regardless of
      source order. */
   .eval-rail.instant .eval-fill { transition: none; }
+  /* try_move's after reading is the answer the charge paid for, so it gets a
+     slow, even sweep (ease-in-out rather than the default's fast-start
+     ease-out, so the motion stays visible the whole way) after a short hold
+     that lets the before reading register first. */
+  .eval-rail.sweep .eval-fill { transition: height 2200ms cubic-bezier(.45, 0, .55, 1) 400ms; }
 }
 
 @keyframes eval-pop {

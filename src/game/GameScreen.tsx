@@ -523,6 +523,9 @@ export function GameScreen({
   // tracked render rather than a value derived at the same instant the
   // "after" one is set.
   const evalInstant = tryMoveResult !== null && tryMovePhase === "before";
+  // The "after" reading is the power's whole answer, so it travels there
+  // slowly enough to watch rather than at the ordinary eval-bar pace.
+  const evalSweep = tryMoveResult !== null && tryMovePhase === "after";
   const finished = live?.status === "finished" || live?.status === "aborted";
   const playable = live?.status === "pending" || live?.status === "live";
   const material = capturedMaterial(live?.fen ?? "");
@@ -622,7 +625,7 @@ export function GameScreen({
                 appeared with the first verdict would resize the board
                 mid-game. */}
             {game.powers_per_player > 0 && (
-              <EvalBar viewerColor={viewerColor} evaluation={evaluation} instant={evalInstant} />
+              <EvalBar viewerColor={viewerColor} evaluation={evaluation} instant={evalInstant} sweep={evalSweep} />
             )}
           </div>
 

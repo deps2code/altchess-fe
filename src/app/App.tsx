@@ -88,7 +88,13 @@ export function App() {
               <p className="intro">Restoring your session…</p>
             </section>
           ) : gameLinkID ? (
-            <GameLink gameID={gameLinkID} viewerID={state.user.id} onLeaveToLobby={goToLobby} />
+            <GameLink
+              key={gameLinkID}
+              gameID={gameLinkID}
+              viewerID={state.user.id}
+              onLeaveToLobby={goToLobby}
+              onOpenGame={goToGame}
+            />
           ) : (
             <Lobby user={state.user} onOpenGame={goToGame} />
           )}

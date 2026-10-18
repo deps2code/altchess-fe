@@ -1,5 +1,13 @@
 import { useEffect, useRef, useState } from "react";
-import { ApiError, api, type ClockFrame, type Game, type PowerID, type PublicUser } from "../api/client";
+import {
+  ApiError,
+  api,
+  type ClockFrame,
+  type Game,
+  type PowerID,
+  type PublicUser,
+  type RematchOffer,
+} from "../api/client";
 import { useAuth } from "../auth/AuthProvider";
 import { formatTimeControl } from "../lobby/format";
 import { mountGameBoard, type BoardHandle } from "./board";
@@ -16,6 +24,7 @@ import {
   FlaskIcon,
   GaugeIcon,
   HomeIcon,
+  RestartIcon,
   ThumbsDownIcon,
   ThumbsUpIcon,
 } from "./icons";
@@ -41,6 +50,11 @@ type LiveState = {
 /** How long the opponent's "a power was used" toast stays up. It leaves
  *  nothing behind afterwards — no count, no tally, no post-game record. */
 const NOTICE_MS = 3000;
+
+/** How often a finished game's end screen checks for a rematch offer, or for
+ *  the other player accepting one. Only while that screen is mounted — a
+ *  player who went back to the lobby never hears of an offer. */
+const REMATCH_POLL_MS = 2000;
 
 /** Mirrors the server's own bound (lobby.MaxFeedbackLength) and the
  *  game_feedback CHECK constraint behind it. */
@@ -100,10 +114,13 @@ export function GameScreen({
   game,
   viewerID,
   onGameEnded,
+  onOpenGame,
 }: {
   game: PlayableGame;
   viewerID: string;
   onGameEnded: () => void;
+  /** Moves to another game — where a rematch lands once it is playable. */
+  onOpenGame: (gameID: string) => void;
 }) {
   const { authorized } = useAuth();
   const playingWhite = game.white.id === viewerID;
@@ -137,6 +154,16 @@ export function GameScreen({
   const [feedbackBusy, setFeedbackBusy] = useState(false);
   const [feedbackError, setFeedbackError] = useState<string | null>(null);
 
+  // Rematch. Against the engine the button starts the next game outright.
+  // Between two people it is an offer: `rematch` is the old game's link as
+  // last read (seeded by the snapshot, then polled while the end screen is
+  // up), and the other player sees it only while their own end screen is.
+  const [rematch, setRematch] = useState<RematchOffer | null>(null);
+  const [rematchBusy, setRematchBusy] = useState(false);
+  const [rematchError, setRematchError] = useState<string | null>(null);
+  const [offerDismissed, setOfferDismissed] = useState(false);
+  const rematchStatusRef = useRef<string | null>(null);
+
   // The viewer's own remaining charges, seeded from the snapshot and then
   // only ever replaced by the server's own number on a power_used frame —
   // there is no client-side decrementing, and no opponent counts exist here
@@ -158,12 +185,17 @@ export function GameScreen({
   // moment it arms, for the other two it's the moment the request is sent.
   const [powersModalOpen, setPowersModalOpen] = useState(false);
 
-  // try_move's own state machine. armedPower is set the moment the button is
-  // clicked, before anything is sent; candidateUCI/previewOpen track the
-  // request from the moment a drag sends it (previewOpen stays true through
-  // the wait for the engine and through the result, so "back to the current
-  // position" is always available — never only once the answer lands).
-  // tryMovePhase drives the eval bar's before → after sweep (see EvalBar).
+  // try_move's own state machine, two steps like the server's session.
+  // Clicking the power sends an opening with no candidate, which spends the
+  // charge and answers with the live reading; tryMoveOpenPly records the ply
+  // that session is open on, and while it is, the button only arms/disarms
+  // the board. armedPower is set once the opening lands; candidateUCI/
+  // previewOpen track the candidate from the moment a drag sends it
+  // (previewOpen stays true through the wait for the engine and through the
+  // result, so "back to the current position" is always available — never
+  // only once the answer lands). tryMovePhase drives the eval bar: "before"
+  // from the opening, swept to "after" when the candidate's reading lands.
+  const [tryMoveOpenPly, setTryMoveOpenPly] = useState<number | null>(null);
   const [armedPower, setArmedPower] = useState<PowerID | null>(null);
   const [candidateUCI, setCandidateUCI] = useState<string | null>(null);
   const [previewOpen, setPreviewOpen] = useState(false);
@@ -215,15 +247,16 @@ export function GameScreen({
             uci,
           });
         }, (uci, expectedPly) => {
-          // A try_move candidate, armed by the powers panel: sent as a power
-          // request rather than a move. previewOpen goes up immediately, not
-          // once the answer lands, so "back to the current position" is
-          // available for the whole wait.
+          // A try_move candidate, armed once the session's opening landed:
+          // sent as a power request rather than a move. previewOpen goes up
+          // immediately, not once the answer lands, so "back to the current
+          // position" is available for the whole wait. powerResult is kept —
+          // it is the opening's live reading, which the bar stays on until
+          // the candidate's own reading arrives.
           const commandID = crypto.randomUUID();
           pendingCommandRef.current = commandID;
           setArmedPower(null);
           setPendingPower("try_move");
-          setPowerResult(null);
           setPreviewOpen(true);
           setCandidateUCI(uci);
           connection.current?.send({
@@ -250,6 +283,7 @@ export function GameScreen({
         setClocksAt(Date.now());
         // This is what rehydrates the panel after a reload: the budget is
         // server state, not anything this browser remembers.
+        setRematch(snapshot.game.rematch ?? null);
         setCharges(snapshot.powers?.remaining ?? null);
         setPowerUsedPly(snapshot.powers?.used_this_turn ? ply : null);
 
@@ -286,6 +320,7 @@ export function GameScreen({
               // handler defined once at mount can't safely read the latest
               // previewOpen/armedPower to decide whether it's needed).
               setPowerResult(null);
+              setTryMoveOpenPly(null);
               setArmedPower(null);
               setPreviewOpen(false);
               setCandidateUCI(null);
@@ -296,6 +331,13 @@ export function GameScreen({
               setWsError(frame.message);
               setPendingPower(null);
               setArmedPower(null);
+              // A failed candidate search leaves the server's session open
+              // (the charge already bought the live reading), so the player
+              // may try another; a stale one closed it.
+              if (frame.code === "stale_ply") {
+                setTryMoveOpenPly(null);
+              }
+              setTryMovePhase("before");
               // A refund must snap the board back too, or a refused/refunded
               // try_move leaves a dead preview on screen. clearPreview is a
               // no-op when there was nothing to clear.
@@ -315,6 +357,7 @@ export function GameScreen({
                 setCharges((previous) => ({ ...(previous ?? {}), [frame.power]: frame.remaining }));
                 setPendingPower(null);
                 setPowerUsedPly(frame.ply);
+                setTryMoveOpenPly(null);
                 return;
               }
 
@@ -332,16 +375,20 @@ export function GameScreen({
                   frame.attacked_squares ?? [],
                 );
               }
-              if (frame.power === "try_move") {
+              if (frame.power === "try_move" && !frame.candidate_uci) {
+                // The opening: the bar comes up on the live reading and the
+                // board arms for the one candidate this session allows.
                 setTryMovePhase("before");
+                setTryMoveOpenPly(frame.ply);
+                setArmedPower("try_move");
+                boardHandle.current?.armCandidate(true);
+              } else if (frame.power === "try_move") {
+                // The before reading has been on the bar since the opening,
+                // so switching phase is all the sweep needs — the ordinary
+                // height transition carries the fill to the after reading.
+                setTryMoveOpenPly(null);
                 boardHandle.current?.showPreview(frame.after_fen ?? "", frame.candidate_uci ?? "");
-                // Two rAFs guarantee an actual paint lands between the
-                // "before" render (instant, no transition — see EvalBar) and
-                // this one, which is what lets the height transition sweep
-                // rather than jump straight to the after reading.
-                requestAnimationFrame(() => {
-                  requestAnimationFrame(() => setTryMovePhase("after"));
-                });
+                setTryMovePhase("after");
               }
             },
             onPowerNotice: () => {
@@ -424,6 +471,72 @@ export function GameScreen({
     }
   }
 
+  // Poll only while this game's end screen is up, and only against a person:
+  // a bot rematch never waits on anybody.
+  const humanGame = game.bot_level == null;
+  const ended = live?.status === "finished" || live?.status === "aborted";
+  useEffect(() => {
+    if (!ended || !humanGame) {
+      return;
+    }
+    const controller = new AbortController();
+    const timer = window.setInterval(() => {
+      authorized((token) => api.gameSnapshot(token, game.id, controller.signal))
+        .then((next) => setRematch(next.game.rematch ?? null))
+        .catch(() => undefined);
+    }, REMATCH_POLL_MS);
+    return () => {
+      controller.abort();
+      window.clearInterval(timer);
+    };
+  }, [ended, humanGame, game.id, authorized]);
+
+  // An offer seen leaving "waiting" on this screen was accepted: both players
+  // go to it. Only on that transition — an old game opened later, whose
+  // rematch was long since played, stays put.
+  useEffect(() => {
+    const previous = rematchStatusRef.current;
+    rematchStatusRef.current = rematch?.status ?? null;
+    if (rematch && previous === "waiting" && rematch.status !== "waiting") {
+      onOpenGame(rematch.id);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rematch?.id, rematch?.status]);
+
+  async function requestRematch() {
+    setRematchBusy(true);
+    setRematchError(null);
+    try {
+      const next = await authorized((token) => api.rematchGame(token, game.id));
+      if (next.status === "waiting") {
+        // Our own offer, now waiting on the other player's poll.
+        setRematch({ id: next.id, status: "waiting", creator_id: viewerID });
+      } else {
+        onOpenGame(next.id);
+      }
+    } catch (cause) {
+      setRematchError(cause instanceof ApiError ? cause.message : "Could not start a rematch.");
+    } finally {
+      setRematchBusy(false);
+    }
+  }
+
+  async function cancelRematch() {
+    if (!rematch) {
+      return;
+    }
+    setRematchBusy(true);
+    setRematchError(null);
+    try {
+      await authorized((token) => api.abortGame(token, rematch.id));
+      setRematch(null);
+    } catch (cause) {
+      setRematchError(cause instanceof ApiError ? cause.message : "Could not cancel the rematch.");
+    } finally {
+      setRematchBusy(false);
+    }
+  }
+
   async function sendFeedback() {
     setFeedbackBusy(true);
     setFeedbackError(null);
@@ -447,13 +560,18 @@ export function GameScreen({
   }
 
   function usePower(power: PowerID) {
-    if (power === "try_move") {
-      // Arms (or, clicked again, disarms) — nothing is sent and no charge is
-      // touched until a drag actually produces a candidate.
+    if (power === "try_move" && live !== null && tryMoveOpenPly === live.ply) {
+      // The session is already paid for: the button only re-arms (or,
+      // clicked again, disarms) the board for its one candidate.
       const next = armedPower === "try_move" ? null : "try_move";
       setArmedPower(next);
       boardHandle.current?.armCandidate(next === "try_move");
       return;
+    }
+    if (power === "try_move") {
+      // A fresh one starts with the bar at equality straight away (see
+      // evalPending), before the live reading is back.
+      setTryMovePhase("before");
     }
     setPendingPower(power);
     setPowerResult(null);
@@ -467,7 +585,7 @@ export function GameScreen({
   }
 
   function playPreviewedMove() {
-    if (!tryMoveResult) {
+    if (!tryMovePreview) {
       return;
     }
     // The frame's own ply, not live?.ply: they agree in every case that can
@@ -480,8 +598,8 @@ export function GameScreen({
     connection.current?.send({
       type: "move",
       command_id: crypto.randomUUID(),
-      expected_ply: tryMoveResult.ply,
-      uci: tryMoveResult.candidate_uci ?? "",
+      expected_ply: tryMovePreview.ply,
+      uci: tryMovePreview.candidate_uci ?? "",
     });
   }
 
@@ -503,11 +621,15 @@ export function GameScreen({
   }
 
   const tryMoveResult = powerResult?.power === "try_move" ? powerResult : null;
+  // Only a candidate's frame is a preview; the opening's carries the live
+  // reading alone.
+  const tryMovePreview = tryMoveResult?.candidate_uci ? tryMoveResult : null;
   // The eval bar reads the viewer's own last verdict: current_eval's single
   // reading, or try_move's before/after pair driven by tryMovePhase (an
   // ended candidate becomes a synthetic reading — see evaluationForOutcome).
   // A best_move result leaves the bar where it was, and the next state frame
-  // clears powerResult and with it the bar either way.
+  // clears powerResult and with it the bar either way — which is also what
+  // hides it once a tried move is actually played.
   const evaluation =
     powerResult?.power === "current_eval"
       ? powerResult
@@ -518,12 +640,16 @@ export function GameScreen({
             ? evaluationForOutcome(tryMoveResult.after_outcome, viewerColor)
             : { score_cp: tryMoveResult.after_score_cp, mate_in: tryMoveResult.after_mate_in }
         : null;
-  // Only the try_move "before" reading is laid out with no transition — see
-  // EvalBar's own doc comment on why that has to be a real, separately
-  // tracked render rather than a value derived at the same instant the
-  // "after" one is set.
-  const evalInstant = tryMoveResult !== null && tryMovePhase === "before";
-  const finished = live?.status === "finished" || live?.status === "aborted";
+  // try_move's bar comes up the moment the power is clicked, before the live
+  // reading is back.
+  const evalPending = pendingPower === "try_move" && powerResult === null;
+  const tryMoveOpen = live !== null && tryMoveOpenPly === live.ply;
+  const finished = ended;
+  const ownOffer = rematch?.status === "waiting" && rematch.creator_id === viewerID;
+  const theirOffer = rematch?.status === "waiting" && rematch.creator_id !== viewerID;
+  // The offer takes the result modal's place rather than stacking on it;
+  // "not now" puts the result back, whose rematch button then accepts.
+  const showOffer = finished && theirOffer && !offerDismissed;
   const playable = live?.status === "pending" || live?.status === "live";
   const material = capturedMaterial(live?.fen ?? "");
   const advantage = viewerColor === "white" ? material.whiteAdvantage : -material.whiteAdvantage;
@@ -532,6 +658,15 @@ export function GameScreen({
   // Same key-presence filter the aside panel uses — a game already in flight
   // when a power shipped simply has no key for it.
   const availablePowers = charges ? POWER_ORDER.filter((power) => charges[power] !== undefined) : [];
+
+  // An open try_move session is already paid for, so its button stays live
+  // through the turn lock — it only re-arms the board from here.
+  function powerButtonDisabled(power: PowerID, remaining: number): boolean {
+    if (power === "try_move" && tryMoveOpen) {
+      return previewOpen || pendingPower !== null;
+    }
+    return !yourTurn || usedThisTurn || previewOpen || remaining <= 0 || pendingPower !== null;
+  }
 
   // Escape backs out of whatever is frontmost: an armed try_move, an open
   // preview, or — matching the click-outside dismissal below — the result.
@@ -549,6 +684,10 @@ export function GameScreen({
         backToPosition();
         return;
       }
+      if (showOffer) {
+        setOfferDismissed(true);
+        return;
+      }
       if (finished && !resultDismissed) {
         setResultDismissed(true);
       }
@@ -556,7 +695,7 @@ export function GameScreen({
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [armedPower, previewOpen, finished, resultDismissed]);
+  }, [armedPower, previewOpen, finished, resultDismissed, showOffer]);
 
   return (
     <div className="game-screen">
@@ -622,7 +761,7 @@ export function GameScreen({
                 appeared with the first verdict would resize the board
                 mid-game. */}
             {game.powers_per_player > 0 && (
-              <EvalBar viewerColor={viewerColor} evaluation={evaluation} instant={evalInstant} />
+              <EvalBar viewerColor={viewerColor} evaluation={evaluation} pending={evalPending} />
             )}
           </div>
 
@@ -666,6 +805,7 @@ export function GameScreen({
               armedPower={armedPower}
               pending={pendingPower}
               previewOpen={previewOpen}
+              tryMoveOpen={tryMoveOpen}
               candidateUCI={candidateUCI}
               result={powerResult}
               yourTurn={yourTurn}
@@ -725,7 +865,7 @@ export function GameScreen({
                     key={power}
                     type="button"
                     className={armedPower === power ? "icon-button power-tile active" : "icon-button power-tile"}
-                    disabled={!yourTurn || usedThisTurn || previewOpen || remaining <= 0 || pendingPower !== null}
+                    disabled={powerButtonDisabled(power, remaining)}
                     title={`${powerLabels[power]} — ${remaining} left`}
                     aria-label={`${powerLabels[power]} — ${remaining} left`}
                     onClick={() => {
@@ -763,15 +903,15 @@ export function GameScreen({
       {/* Mobile-only companion to the aside's own try-move confirm pair (same
           eval readout, same actions) — fixed to the bottom of the screen so
           both are visible without scrolling back up to the aside. */}
-      {tryMoveResult && previewOpen && (
+      {tryMovePreview && previewOpen && (
         <div className="try-move-confirm-bar" role="dialog" aria-modal="true" aria-label="Play the previewed move?">
           <p className="try-move-confirm-eval">
-            <strong>{formatEvaluation(tryMoveResult)}</strong>
+            <strong>{formatEvaluation(tryMovePreview)}</strong>
             {" → "}
             <strong>
-              {tryMoveResult.after_outcome
-                ? outcomeLabels[tryMoveResult.after_outcome]
-                : formatEvaluation({ score_cp: tryMoveResult.after_score_cp, mate_in: tryMoveResult.after_mate_in })}
+              {tryMovePreview.after_outcome
+                ? outcomeLabels[tryMovePreview.after_outcome]
+                : formatEvaluation({ score_cp: tryMovePreview.after_score_cp, mate_in: tryMovePreview.after_mate_in })}
             </strong>
           </p>
           <div className="try-move-confirm-actions">
@@ -820,7 +960,49 @@ export function GameScreen({
         </div>
       )}
 
-      {finished && live && !resultDismissed && (
+      {showOffer && (
+        <div className="modal-backdrop soft">
+          <div className="modal soft" role="dialog" aria-modal="true" aria-labelledby="rematch-heading">
+            <span className="result-icon" aria-hidden="true">
+              ♞
+            </span>
+            <h3 id="rematch-heading">Rematch?</h3>
+            <p className="hint">
+              {opponent.display_name} wants to play again — same time control, and you take{" "}
+              {viewerColor === "white" ? "black" : "white"} this time.
+            </p>
+            <div className="modal-actions">
+              <button
+                type="button"
+                className="icon-button primary"
+                title="Accept the rematch"
+                aria-label="Accept the rematch"
+                disabled={rematchBusy}
+                onClick={() => void requestRematch()}
+              >
+                <CheckIcon />
+              </button>
+              <button
+                type="button"
+                className="icon-button"
+                title="Not now"
+                aria-label="Not now"
+                onClick={() => setOfferDismissed(true)}
+              >
+                <CloseIcon />
+              </button>
+            </div>
+            <p className="hint action-caption">{rematchBusy ? "Joining…" : "Accept · not now"}</p>
+            {rematchError && (
+              <p className="error" role="alert">
+                {rematchError}
+              </p>
+            )}
+          </div>
+        </div>
+      )}
+
+      {finished && live && !resultDismissed && !showOffer && (
         <div
           className="modal-backdrop soft"
           onClick={(event) => {
@@ -877,9 +1059,10 @@ export function GameScreen({
                 {game.bot_level != null && <p className="hint result-note">Unrated · you played the engine</p>}
               </>
             )}
-            {/* Icon-only and side by side: leave, or stay and look at the
-                final position. Reviewing is the same dismissal the close
-                button and the backdrop click already do. */}
+            {/* Icon-only and side by side: leave, play again, or stay and
+                look at the final position. Reviewing is the same dismissal
+                the close button and the backdrop click already do. An offer
+                of our own turns the middle button into its cancel. */}
             <div className="modal-actions">
               <button
                 type="button"
@@ -890,6 +1073,29 @@ export function GameScreen({
               >
                 <HomeIcon />
               </button>
+              {ownOffer ? (
+                <button
+                  type="button"
+                  className="icon-button"
+                  title="Cancel the rematch offer"
+                  aria-label="Cancel the rematch offer"
+                  disabled={rematchBusy}
+                  onClick={() => void cancelRematch()}
+                >
+                  <CloseIcon />
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  className={theirOffer ? "icon-button active" : "icon-button"}
+                  title={theirOffer ? "Accept the rematch" : "Rematch"}
+                  aria-label={theirOffer ? "Accept the rematch" : "Rematch"}
+                  disabled={rematchBusy}
+                  onClick={() => void requestRematch()}
+                >
+                  <RestartIcon />
+                </button>
+              )}
               <button
                 type="button"
                 className="icon-button"
@@ -900,7 +1106,18 @@ export function GameScreen({
                 <BoardIcon />
               </button>
             </div>
-            <p className="hint action-caption">Back to lobby · review the position</p>
+            <p className="hint action-caption">
+              {ownOffer
+                ? `Waiting for ${opponent.display_name} to accept…`
+                : theirOffer
+                  ? `${opponent.display_name} wants a rematch`
+                  : "Back to lobby · rematch · review the position"}
+            </p>
+            {rematchError && (
+              <p className="error" role="alert">
+                {rematchError}
+              </p>
+            )}
 
             <div className="feedback">
               <p className="section-number">How was this game?</p>
@@ -1073,6 +1290,7 @@ function PowersPanel({
   armedPower,
   pending,
   previewOpen,
+  tryMoveOpen,
   candidateUCI,
   result,
   yourTurn,
@@ -1090,6 +1308,9 @@ function PowersPanel({
    *  discarded — spans both the wait for the engine and the result, since
    *  "back to the current position" is offered for the whole span. */
   previewOpen: boolean;
+  /** A try_move session is open on this ply: its charge is spent and the
+   *  turn locked, but its one candidate is still to come. */
+  tryMoveOpen: boolean;
   candidateUCI: string | null;
   result: PowerUsedFrame | null;
   yourTurn: boolean;
@@ -1105,7 +1326,7 @@ function PowersPanel({
   // for it at all, and that is a different thing from having spent it all.
   const powers = POWER_ORDER.filter((power) => charges[power] !== undefined);
   const enabled = yourTurn && !usedThisTurn && !previewOpen;
-  const tryMoveResult = result?.power === "try_move" ? result : null;
+  const tryMoveResult = result?.power === "try_move" && result.candidate_uci ? result : null;
 
   return (
     <div className="powers-panel">
@@ -1119,15 +1340,33 @@ function PowersPanel({
               key={power}
               type="button"
               className={armed ? "choice active" : "choice"}
-              disabled={!enabled || remaining <= 0 || pending !== null}
+              disabled={
+                power === "try_move" && tryMoveOpen
+                  ? previewOpen || pending !== null
+                  : !enabled || remaining <= 0 || pending !== null
+              }
               onClick={() => onUse(power)}
             >
               <strong>{powerLabels[power]}</strong>
-              <span>{pending === power ? "Thinking…" : armed ? "Drag a move to try it" : `${remaining} left`}</span>
+              <span>
+                {pending === power && !previewOpen
+                  ? "Thinking…"
+                  : armed
+                    ? "Drag a move to try it"
+                    : power === "try_move" && tryMoveOpen
+                      ? "Click to drag a move"
+                      : `${remaining} left`}
+              </span>
             </button>
           );
         })}
       </div>
+
+      {result?.power === "try_move" && !result.candidate_uci && tryMoveOpen && (
+        <p className="power-result" role="status">
+          <strong>{formatEvaluation(result)}</strong> for White now
+        </p>
+      )}
 
       {result && result.power !== "try_move" && (
         <p className="power-result" role="status">
@@ -1200,7 +1439,9 @@ function PowersPanel({
         ))}
 
       {!yourTurn && <p className="hint">Powers can only be used on your own turn.</p>}
-      {yourTurn && usedThisTurn && !previewOpen && <p className="hint">One power per turn — make your move.</p>}
+      {yourTurn && usedThisTurn && !previewOpen && !tryMoveOpen && (
+        <p className="hint">One power per turn — make your move.</p>
+      )}
     </div>
   );
 }

@@ -122,6 +122,19 @@ export type Game = {
    *  game apart — there is no is_bot flag on the wire — and why such a game
    *  shows no rating change: bot games are unrated. */
   bot_level?: number;
+  /** The next game a player offered from this one — absent until somebody
+   *  asks, and again once the offer was cancelled. */
+  rematch?: RematchOffer;
+};
+
+/** A rematch as both players' end screens need it: the one who offered
+ *  watches `status` leave "waiting" (accepted), the other reads `creator_id`
+ *  to tell an offer made to them from their own. `creator_id` only means
+ *  "who offered" while `status` is "waiting". */
+export type RematchOffer = {
+  id: string;
+  status: string;
+  creator_id: string;
 };
 
 export type SeekRequest = {
@@ -319,6 +332,13 @@ export const api = {
 
   abortGame: (token: string, gameID: string) =>
     request<Game>(`/api/v1/games/${encodeURIComponent(gameID)}/abort`, { method: "POST", token }),
+
+  /** Offers or accepts the next game from a finished one: same terms,
+   *  colours swapped. Against the engine the answer is already playable;
+   *  between two people it is a waiting invite until the other player's own
+   *  call joins it. */
+  rematchGame: (token: string, gameID: string) =>
+    request<Game>(`/api/v1/games/${encodeURIComponent(gameID)}/rematch`, { method: "POST", token }),
 
   gameSnapshot: (token: string, gameID: string, signal?: AbortSignal) =>
     request<GameSnapshot>(`/api/v1/games/${encodeURIComponent(gameID)}`, { token, signal }),

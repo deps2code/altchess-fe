@@ -12,22 +12,19 @@ import { formatEvaluationShort, whiteShare, type Evaluation } from "./evaluation
 export function EvalBar({
   viewerColor,
   evaluation,
-  instant = false,
+  pending = false,
 }: {
   viewerColor: "white" | "black";
   /** null between verdicts — a reading belongs to the position it was asked
    *  about, so the next move clears it, and with it the bar. */
   evaluation: Evaluation | null;
-  /** True for the render that first lays a fresh reading out with no
-   *  transition, so a later render can animate *from* it rather than from
-   *  wherever the bar happened to be. try_move uses this for its before →
-   *  after sweep: the before reading is painted instantly, then a later
-   *  render switches to the after reading with this back at its default, so
-   *  the existing height transition carries it there. Every other caller
-   *  leaves this at its default and keeps the bar's plain cross-fade. */
-  instant?: boolean;
+  /** True while a reading has been asked for but has not landed yet. The
+   *  rail shows at equality with no label, so the reading then travels in
+   *  from the middle rather than fading in already in place. try_move uses
+   *  this to bring the bar up the moment the power is clicked. */
+  pending?: boolean;
 }) {
-  const visible = evaluation !== null;
+  const visible = evaluation !== null || pending;
   const white = evaluation ? whiteShare(evaluation) : 0.5;
   const bottom = viewerColor === "white" ? white : 1 - white;
   const label = evaluation ? formatEvaluationShort(evaluation) : "";
@@ -35,7 +32,6 @@ export function EvalBar({
     "eval-rail",
     viewerColor === "white" ? "white-bottom" : "black-bottom",
     visible ? "is-live" : "",
-    instant ? "instant" : "",
   ]
     .filter(Boolean)
     .join(" ");
@@ -43,16 +39,16 @@ export function EvalBar({
   return (
     <div
       className={classes}
-      role={visible ? "img" : undefined}
-      aria-hidden={!visible}
-      aria-label={visible ? `Evaluation ${label}, from White's point of view` : undefined}
-      title={visible ? `${label} for White` : undefined}
+      role={evaluation ? "img" : undefined}
+      aria-hidden={!evaluation}
+      aria-label={evaluation ? `Evaluation ${label}, from White's point of view` : undefined}
+      title={evaluation ? `${label} for White` : undefined}
     >
       {/* The height is the datum itself, not styling, so it is the one thing
           here that cannot live in styles.css. */}
       <div className="eval-fill" style={{ height: `${(bottom * 100).toFixed(1)}%` }} />
       {/* Keyed by the reading so each new verdict replays its own entrance. */}
-      {visible && (
+      {evaluation && (
         <span key={label} className="eval-value">
           {label}
         </span>

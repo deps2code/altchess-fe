@@ -17,10 +17,13 @@ export function GameLink({
   gameID,
   viewerID,
   onLeaveToLobby,
+  onOpenGame,
 }: {
   gameID: string;
   viewerID: string;
   onLeaveToLobby: () => void;
+  /** Moves to another game — a rematch, started from this one's end screen. */
+  onOpenGame: (gameID: string) => void;
 }) {
   const { authorized } = useAuth();
   const [snapshot, setSnapshot] = useState<GameSnapshot | null>(null);
@@ -138,7 +141,7 @@ export function GameLink({
   const isParticipant = game.white?.id === viewerID || game.black?.id === viewerID;
   if (isParticipant && game.white && game.black) {
     const playable: PlayableGame = { ...game, white: game.white, black: game.black };
-    return <GameScreen game={playable} viewerID={viewerID} onGameEnded={onLeaveToLobby} />;
+    return <GameScreen game={playable} viewerID={viewerID} onGameEnded={onLeaveToLobby} onOpenGame={onOpenGame} />;
   }
 
   return <Unavailable message="This game isn't available to you." onLeaveToLobby={onLeaveToLobby} />;

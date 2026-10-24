@@ -154,14 +154,13 @@ button.ghost:hover { border-color: var(--terracotta); background: none; color: v
 
 .lobby { display: grid; grid-template-columns: minmax(0, 1fr) minmax(20rem, 1fr); gap: 5vw; padding: clamp(3.5rem, 8vw, 6rem) 5vw; }
 .profile { margin-top: 2.5rem; padding-top: 1.75rem; border-top: 1px solid var(--line); }
-.profile h3, .board-side h3 { display: flex; align-items: center; gap: 1rem; margin: 0; font-family: Georgia, serif; font-size: 1.9rem; font-weight: 400; }
+.profile h3 { display: flex; align-items: center; gap: 1rem; margin: 0; font-family: Georgia, serif; font-size: 1.9rem; font-weight: 400; }
 .handle { margin: .35rem 0 0; color: var(--ink-3); font-size: .9rem; }
 
 dl { display: flex; flex-wrap: wrap; gap: 2.5rem; margin: 1.75rem 0 0; }
 dt { color: var(--ink-3); font-size: .68rem; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; }
 dd { margin: .4rem 0 0; font-family: Georgia, serif; font-size: 1.75rem; }
 
-.board-side .section-number { margin: 0 0 .75rem; }
 .dots::after { content: "…"; }
 
 /* Searching modal: a central overlay with a spinning pawn, shown while a seek
@@ -255,6 +254,8 @@ dd { margin: .4rem 0 0; font-family: Georgia, serif; font-size: 1.75rem; }
 .board-stage { flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr) minmax(18rem, .6fr); gap: 4vw; align-items: center; padding: 2.5rem 5vw; overflow: auto; }
 .board-mount { justify-self: center; width: min(70vh, 100%); aspect-ratio: 1; border: 1px solid var(--line-strong); box-shadow: 0 1.5rem 4rem var(--shadow); }
 .board-side { align-self: start; }
+.board-side dl { gap: 1.5rem; margin-top: 0; }
+.board-side dd { margin-top: .2rem; font-size: 1.2rem; }
 
 /* The board plus a name plate on each side of it: opponent above, viewer
    below, both the width of the board itself. */
@@ -275,7 +276,7 @@ dd { margin: .4rem 0 0; font-family: Georgia, serif; font-size: 1.75rem; }
 .captured { display: flex; flex-wrap: wrap; align-items: center; gap: .05rem; margin: .2rem 0 0; min-height: 1.1rem; font-size: .95rem; line-height: 1; }
 .material-lead { margin-left: .35rem; color: var(--ink-3); font-size: .72rem; font-weight: 700; }
 
-.powers-panel { margin-top: 2rem; padding-top: 1.5rem; border-top: 1px solid var(--line); }
+.powers-panel { margin-top: 1.25rem; padding-top: 1rem; border-top: 1px solid var(--line); }
 .powers-panel .section-number { margin: 0 0 .75rem; }
 /* One column of row-shaped cards, not a grid of square ones: three powers in
    an ~18rem aside leave no room for a label plus a count per column without
@@ -287,50 +288,91 @@ dd { margin: .4rem 0 0; font-family: Georgia, serif; font-size: 1.75rem; }
 .power-result { margin: .85rem 0 0; padding: .65rem .8rem; border: 1px solid var(--saffron); border-left-width: 3px; color: var(--ink); background: var(--surface); font-size: .9rem; }
 .power-result strong { color: var(--terracotta-deep); font-family: Georgia, serif; font-size: 1.15rem; }
 
-/* Over the board, never a modal: the game is still live and the board has to
-   stay clickable. It clears itself and leaves nothing behind. */
-.power-toast { position: absolute; top: 1rem; left: 50%; transform: translateX(-50%); margin: 0; padding: .5rem .9rem; border: 1px solid var(--saffron); background: var(--surface-glass); color: var(--ink); font-size: .78rem; letter-spacing: .04em; box-shadow: 0 .5rem 1.5rem var(--shadow); }
+/* Positioned so the opponent's sr-only announcement stays inside the column. */
 .board-column { position: relative; }
 
-/* Mobile powers picker: hidden by default, since the aside's own panel
-   already covers this above the breakpoint below. A solid saffron fill plus a
-   soft halo (rather than the app's usual thin outline) is deliberate here —
-   every other control on this screen is quiet by design, and this is the one
-   button that has to read as "tap me" at a glance on a small screen. */
-.powers-fab {
-  display: none;
-  position: fixed;
-  right: 1.1rem;
-  bottom: 1.1rem;
-  z-index: 55;
-  width: 3.5rem;
-  height: 3.5rem;
-  border: 2px solid var(--saffron);
-  color: var(--ink);
-  background: var(--saffron);
-  box-shadow: 0 0 0 .35rem var(--saffron-tint), 0 .6rem 1.4rem var(--shadow);
-}
-.powers-fab svg { width: 1.6rem; height: 1.6rem; }
-.powers-fab:hover { color: var(--ink); background: var(--saffron-light); border-color: var(--saffron-light); box-shadow: 0 0 0 .45rem var(--saffron-tint), 0 .7rem 1.6rem var(--shadow); }
-.powers-modal { width: min(19rem, 100%); }
-.powers-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: .6rem; margin-top: .25rem; }
-.power-tile { position: relative; width: 100%; aspect-ratio: 1; border-radius: .7rem; }
-.power-tile svg { width: 1.5rem; height: 1.5rem; }
-.power-tile-count { position: absolute; right: .3rem; bottom: .2rem; min-width: 1.1rem; padding: 0 .3rem; border-radius: 999px; background: var(--saffron); color: var(--ink); font-size: .65rem; font-weight: 700; line-height: 1.3; }
+/* Mobile power dock: hidden by default, since the aside's own panel already
+   covers this above the breakpoint below. It is the stage's last grid row, in
+   flow rather than fixed — right under the side panel when everything fits,
+   and stuck to the bottom of the stage once the stage has to scroll. */
+.power-dock { display: none; position: sticky; bottom: calc(.9rem + env(safe-area-inset-bottom)); z-index: 55; justify-self: center; flex-direction: column; align-items: center; gap: .5rem; max-width: 100%; }
 
-/* Mobile-only floating bars anchored below the board: a reminder while
+/* The power bar: a terracotta pill — the app's action colour, so it reads as
+   controls against the cream page and the board — holding one round tile per
+   power. A tap opens a tile into a wider pill (a saffron disc plus the
+   power's name); dragging a tile onto the board plays it. */
+.power-bar { display: flex; max-width: 100%; align-items: center; gap: .35rem; padding: .35rem; border-radius: 999px; background: var(--terracotta-deep); box-shadow: 0 0 0 1px var(--shadow), 0 .9rem 2rem var(--shadow); }
+.power-bar-tile { display: flex; align-items: center; min-width: 0; height: 3.3rem; margin: 0; padding: 0; border: 0; border-radius: 999px; color: var(--cream); background: var(--terracotta); text-align: left; touch-action: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; cursor: grab; }
+.power-bar-tile:hover { color: var(--surface); background: var(--terracotta); }
+.power-bar-disc { position: relative; flex: none; display: inline-flex; align-items: center; justify-content: center; width: 2.75rem; height: 2.75rem; margin: .275rem; padding: 0; border-radius: 999px; }
+.power-bar-disc svg { width: 1.6rem; height: 1.6rem; }
+.power-bar-count { position: absolute; top: -.25rem; right: -.3rem; min-width: 1.1rem; padding: 0 .25rem; border: 2px solid var(--terracotta); border-radius: 999px; background: var(--saffron); color: var(--ink); font-size: .62rem; font-weight: 700; line-height: 1.25; text-align: center; }
+.power-bar-text { display: flex; flex-direction: column; justify-content: center; min-width: 0; max-width: 0; padding: 0; overflow: hidden; opacity: 0; white-space: nowrap; }
+.power-bar-text strong { overflow: hidden; color: var(--surface); font-size: .92rem; font-weight: 700; text-overflow: ellipsis; }
+.power-bar-text small { overflow: hidden; color: var(--saffron-light); font-size: .68rem; text-overflow: ellipsis; }
+.power-bar-tile.expanded .power-bar-disc { color: var(--ink); background: var(--saffron); box-shadow: 0 .25rem .6rem var(--shadow); }
+.power-bar-tile.expanded .power-bar-count { border-color: var(--saffron); background: var(--surface); }
+.power-bar-tile.expanded .power-bar-text { max-width: 10rem; padding-right: 1.1rem; padding-left: .3rem; opacity: 1; }
+.power-bar-tile.armed:not(.expanded) .power-bar-disc { color: var(--saffron-light); box-shadow: inset 0 0 0 2px var(--saffron); }
+.power-bar-tile.blocked:not(.expanded) .power-bar-disc svg { opacity: .45; }
+.power-bar-tile.blocked.expanded .power-bar-disc { color: var(--terracotta-deep); background: var(--well); box-shadow: none; }
+.power-bar-tile.blocked { cursor: pointer; }
+.power-bar-tile:focus-visible { outline: 2px solid var(--saffron); outline-offset: 2px; }
+/* While a power is held its tile is the empty socket it came out of, and the
+   rest of the bar steps back. */
+.power-bar.holding .power-bar-tile:not(.lifted) { opacity: .55; }
+.power-bar-tile.lifted { background: var(--terracotta-deep); box-shadow: inset 0 0 0 2px var(--saffron-tint); cursor: grabbing; }
+.power-bar-tile.lifted .power-bar-disc { color: transparent; background: none; box-shadow: inset 0 0 0 2px var(--saffron); }
+.power-bar-tile.lifted .power-bar-count { visibility: hidden; }
+
+/* The power in hand: a saffron disc floating above the fingertip. It grows and
+   straightens once it is over the board. Its position is the one inline style
+   here (left/top); everything about its look stays in this file. */
+.power-bar-ghost { position: fixed; z-index: 70; display: inline-flex; align-items: center; justify-content: center; width: 3.5rem; height: 3.5rem; border: 3px solid var(--terracotta-deep); border-radius: 999px; color: var(--ink); background: var(--saffron); box-shadow: 0 1rem 2rem var(--shadow); transform: translate(-50%, -135%) scale(1) rotate(-8deg); pointer-events: none; }
+.power-bar-ghost.over { transform: translate(-50%, -135%) scale(1.12) rotate(0deg); box-shadow: 0 0 0 .5rem var(--saffron-tint), 0 1.2rem 2.4rem var(--shadow); }
+.power-bar-ghost svg { width: 1.75rem; height: 1.75rem; }
+
+/* The board as a target: dashed while something is held, solid and pulsing
+   once it is over the board. Outline only — `.board-tilt` must keep its 3D. */
+.board-tilt.drop-target .board-mount { outline: 2px dashed var(--terracotta); outline-offset: 4px; }
+.board-tilt.drop-ready .board-mount { outline: 3px solid var(--saffron); outline-offset: 4px; }
+
+@media (prefers-reduced-motion: no-preference) {
+  .power-bar-tile { transition: background-color 200ms ease, opacity 200ms ease, transform 160ms ease; }
+  .power-bar-tile:active:not(.lifted) { transform: scale(.94); }
+  .power-bar-text { transition: max-width 260ms cubic-bezier(.3, .7, .4, 1), opacity 200ms ease, padding 260ms cubic-bezier(.3, .7, .4, 1); }
+  .power-bar-disc { transition: background-color 200ms ease, color 200ms ease, box-shadow 200ms ease; }
+  /* Opening an enabled tile nudges its disc upward twice: the gesture it is
+     asking for, since a tap on its own does nothing. */
+  .power-bar-tile.expanded:not(.blocked):not(.armed) .power-bar-disc { animation: power-bar-nudge 900ms ease-in-out 200ms 2; }
+  .power-bar-ghost { transition: transform 160ms ease, box-shadow 160ms ease; animation: power-bar-lift 220ms cubic-bezier(.3, .7, .4, 1.4); }
+  .board-tilt.drop-target .board-mount { animation: drop-target-march 1.2s linear infinite; }
+  .board-tilt.drop-ready .board-mount { animation: drop-ready-pulse 900ms ease-in-out infinite; }
+}
+@keyframes power-bar-nudge {
+  0%, 100% { transform: translateY(0); }
+  40% { transform: translateY(-.4rem); }
+  60% { transform: translateY(-.25rem); }
+}
+@keyframes power-bar-lift {
+  from { transform: translate(-50%, -50%) scale(.6) rotate(0deg); opacity: .4; }
+}
+@keyframes drop-target-march {
+  0%, 100% { outline-offset: 4px; }
+  50% { outline-offset: 7px; }
+}
+@keyframes drop-ready-pulse {
+  0%, 100% { outline-color: var(--saffron); outline-offset: 4px; }
+  50% { outline-color: var(--saffron-light); outline-offset: 8px; }
+}
+
+/* Mobile-only bars stacked in the dock above the power bar: a reminder while
    try_move is armed and waiting for a drag, and — once the candidate's
    answer lands — the eval change plus the accept/discard pair. Only one is
-   ever shown at a time (arming clears once a candidate is sent), so both
-   share the same fixed spot. */
+   ever shown at a time (arming clears once a candidate is sent). */
 .try-move-hint-bar,
 .try-move-confirm-bar {
-  display: none;
-  position: fixed;
-  left: 50%;
-  bottom: 1.1rem;
-  transform: translateX(-50%);
-  z-index: 55;
+  display: flex;
   padding: .55rem .9rem;
   border: 1px solid var(--saffron);
   border-radius: 1rem;
@@ -351,9 +393,15 @@ dd { margin: .4rem 0 0; font-family: Georgia, serif; font-size: 1.75rem; }
   .hero.photo { min-height: auto; align-items: start; gap: 2.5rem; }
   .lobby { padding-inline: 1.25rem; }
   .status { display: inline-flex; align-items: center; font-size: .68rem; }
-  .board-stage { grid-template-columns: 1fr; padding-inline: 1.25rem; }
-  .powers-fab { display: inline-flex; }
-  .try-move-hint-bar, .try-move-confirm-bar { display: flex; }
+  /* Stacked, the two rows would otherwise stretch to fill the stage's fixed
+     height and centre the board in the taller one — space above the side
+     panel, and the panel and power bar pushed down the screen. Pack them at
+     the top instead. */
+  .board-stage { grid-template-columns: 1fr; align-content: start; align-items: start; gap: 1.25rem; padding: 1.25rem 1.25rem 2rem; }
+  .power-dock { display: flex; }
+  /* The bar replaces the panel's buttons; its readouts (a verdict, a preview) stay. */
+  .powers-panel { margin-top: .75rem; padding-top: 0; border-top: 0; }
+  .powers-panel > .section-number, .powers-panel > .power-buttons, .powers-panel > .hint { display: none; }
 }
 
 @media (prefers-reduced-motion: no-preference) {
@@ -430,8 +478,9 @@ dd { margin: .4rem 0 0; font-family: Georgia, serif; font-size: 1.75rem; }
    The board and its rail share a row, so the player bars above and below
    span both. The rail's background is the side at the top of the board and
    the fill is the viewer's own side, growing from the bottom. */
-.board-row { display: flex; align-items: flex-start; gap: .55rem; width: min(70vh, 100%); }
-.board-row .board-mount { flex: 1 1 auto; width: auto; min-width: 0; }
+.board-row { display: flex; align-items: flex-start; gap: .55rem; width: min(70vh, 100%); perspective: 1400px; }
+.board-row .board-tilt { position: relative; flex: 1 1 auto; min-width: 0; transform-origin: 50% 60%; transform-style: preserve-3d; }
+.board-row .board-mount { width: 100%; }
 /* The board's own aspect-ratio sets the row's height; the rail stretches to
    whatever that turns out to be. */
 /* Hidden by default (opacity, not display/unmounting — its box stays in the
@@ -500,3 +549,99 @@ cg-board square.move-dest:hover, cg-board square.move-dest.hover { background: #
 .orientation-white .files :nth-child(odd),
 .orientation-black .ranks :nth-child(odd),
 .orientation-black .files :nth-child(even) { color: var(--sq-light); }
+
+/* ── Power stamp ─────────────────────────────────────────────────────────
+   Three seconds when a power is played: the board tips back into 3D, a stamper
+   comes down on it and leaves the power's icon in ink, and the board settles
+   flat again. Everything below hangs off one clock, --stamp-ms; the layer's
+   own `stamp-clock` animation is what tells PowerStamp it is over. The tilt
+   is on `.board-tilt`, which is inside `.board-row`'s perspective, and every
+   child of it up to the stamper keeps preserve-3d so they share one space.
+
+   Reduced motion gets none of the movement: no tilt, no stamper, just the ink
+   fading in and out flat, over half the time. */
+.board-row { --stamp-ms: 1500ms; --stamper-h: 7.5rem; }
+.board-stage:has(.board-tilt.stamping) { overflow: hidden; }
+.board-tilt.stamping .board-mount { pointer-events: none; }
+.stamp-layer { position: absolute; inset: 0; pointer-events: none; transform-style: preserve-3d; animation: stamp-clock var(--stamp-ms) linear both; }
+.stamp-defs { position: absolute; }
+.stamp-ink { position: absolute; left: 50%; top: 50%; width: 36%; aspect-ratio: 1; translate: -50% -50%; display: grid; place-items: center; align-content: center; row-gap: .3rem; border: .28rem solid var(--terracotta); border-radius: 10%; color: var(--terracotta); opacity: 0; filter: url(#stamp-rough); animation: ink-fade var(--stamp-ms) ease both; }
+.stamp-ink::before { content: ""; position: absolute; inset: .45rem; border: .12rem solid currentColor; border-radius: 6%; }
+.stamp-icon { width: 58%; height: auto; }
+/* The ink carries a name under its icon, so the icon gives up some width. */
+.stamp-ink .stamp-icon { width: 44%; }
+.stamp-label { font-size: clamp(.7rem, 1.9vw, 1.05rem); font-weight: 800; letter-spacing: .1em; text-transform: uppercase; text-align: center; line-height: 1.1; }
+.stamper, .stamp-shadow { display: none; }
+
+@media (prefers-reduced-motion: no-preference) {
+  .board-row { --stamp-ms: 3000ms; }
+  .board-tilt.stamping { animation: board-tilt var(--stamp-ms) both; }
+  .board-tilt.stamping .board-mount { animation: board-shadow var(--stamp-ms) ease both; }
+  .stamp-ink { animation-name: ink-press; animation-timing-function: linear; }
+  .stamper, .stamp-shadow { display: block; position: absolute; left: 50%; top: 50%; width: 30%; aspect-ratio: 1; translate: -50% -50%; }
+  .stamper { transform-style: preserve-3d; animation: stamper-drop var(--stamp-ms) both; }
+  /* The fade is on the two faces, never on .stamper: any opacity below 1 on
+     it would flatten its children and the block would collapse to its top. */
+  .stamper-top, .stamper-front { animation: stamper-fade var(--stamp-ms) both; }
+  /* The top face is the one the icon is on, raised a stamper's height off the
+     board; the front face hangs from its lower edge back down to the board,
+     dark rubber at the foot (its own top edge, once turned upright). */
+  .stamper-top { position: absolute; inset: 0; display: grid; place-items: center; border-radius: .9rem; background: linear-gradient(160deg, #fff 0%, var(--surface) 70%); color: var(--ink-2); box-shadow: inset 0 0 0 .3rem var(--surface), inset 0 0 0 .36rem var(--line-strong); transform: translateZ(var(--stamper-h)); }
+  .stamper-front { position: absolute; left: 0; right: 0; top: 100%; height: var(--stamper-h); border-radius: 0 0 .9rem .9rem; background: linear-gradient(to bottom, var(--dark-side) 0 12%, var(--surface) 12%, var(--well) 100%); transform-origin: 50% 0; transform: rotateX(90deg); }
+  .stamp-shadow { border-radius: 22%; background: var(--shadow); filter: blur(.8rem); opacity: 0; animation: stamp-shadow var(--stamp-ms) both; }
+}
+
+/* Animates nothing visible on purpose: an opacity animation, even 1 to 1, can
+   make a browser flatten the 3D context the stamper lives in. */
+@keyframes stamp-clock { from, to { --stamp-tick: 0; } }
+
+@keyframes ink-fade {
+  0% { opacity: 0; }
+  25%, 80% { opacity: .92; }
+  100% { opacity: 0; }
+}
+
+/* As shares of the clock: 0-17.5% tips back · 17.5-42.5% stamper drops ·
+   42.5-47.5% impact · 47.5-70% it lifts away · 70-100% the board eases flat,
+   the ink holding to 82% so its name can be read, then fading. */
+@keyframes board-tilt {
+  0% { transform: rotateX(0) rotateZ(0) scale(1) translateZ(0); animation-timing-function: cubic-bezier(.2, .7, .2, 1); }
+  17.5%, 42.5% { transform: rotateX(35deg) rotateZ(-6deg) scale(.88) translateZ(0); animation-timing-function: ease-out; }
+  45% { transform: rotateX(35deg) rotateZ(-6deg) scale(.88) translateZ(-14px); animation-timing-function: ease-out; }
+  50%, 70% { transform: rotateX(35deg) rotateZ(-6deg) scale(.88) translateZ(0); animation-timing-function: ease-in-out; }
+  100% { transform: rotateX(0) rotateZ(0) scale(1) translateZ(0); }
+}
+
+@keyframes board-shadow {
+  0%, 100% { box-shadow: 0 1.5rem 4rem var(--shadow); }
+  17.5%, 70% { box-shadow: 0 3rem 5rem var(--shadow); }
+}
+
+@keyframes stamper-drop {
+  0% { transform: translateZ(340px); }
+  17.5% { transform: translateZ(300px); animation-timing-function: cubic-bezier(.5, 0, .9, .4); }
+  42.5% { transform: translateZ(0) scale3d(1, 1, 1); animation-timing-function: ease-out; }
+  46% { transform: translateZ(-6px) scale3d(1.05, 1.05, .8); }
+  47.5% { transform: translateZ(0) scale3d(1, 1, 1); animation-timing-function: ease-in; }
+  70%, 100% { transform: translateZ(300px); }
+}
+
+@keyframes stamper-fade {
+  0%, 17.5% { opacity: 0; }
+  24%, 58% { opacity: 1; }
+  70%, 100% { opacity: 0; }
+}
+
+@keyframes stamp-shadow {
+  0%, 17.5% { opacity: 0; transform: translateZ(1px) scale(1.5); }
+  42.5% { opacity: .55; transform: translateZ(1px) scale(1.04); animation-timing-function: ease-out; }
+  47.5% { opacity: .5; transform: translateZ(1px) scale(1); }
+  70%, 100% { opacity: 0; transform: translateZ(1px) scale(1.5); }
+}
+
+@keyframes ink-press {
+  0%, 42.5% { opacity: 0; transform: translateZ(1px) scale(1.22); }
+  47.5% { opacity: .92; transform: translateZ(1px) scale(1); }
+  82% { opacity: .92; }
+  100% { opacity: 0; transform: translateZ(1px) scale(1); }
+}

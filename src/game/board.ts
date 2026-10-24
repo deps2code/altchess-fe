@@ -62,6 +62,10 @@ export type BoardHandle = {
   /** Restores the last authoritative position (whatever applyState last set)
    *  and unfreezes the board. A no-op when there is no preview up. */
   clearPreview: () => void;
+  /** Re-measures the board and redraws every piece and shape. chessground
+   *  caches the board's bounding rect, so call this once a CSS transform
+   *  that was on it (the power stamp's tilt) is gone. */
+  refreshBounds: () => void;
   destroy: () => void;
 };
 
@@ -213,6 +217,9 @@ export function mountGameBoard(
       }
       previewing = false;
       render(current);
+    },
+    refreshBounds() {
+      api.redrawAll();
     },
     destroy() {
       api.destroy();

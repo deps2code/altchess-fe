@@ -18,12 +18,6 @@ export function App() {
     () => new URLSearchParams(window.location.search).get("game"),
   );
 
-  // `?invite={code}` prefills the sign-up form's invite code, for sharing a
-  // registration invite as a link instead of dictating the code by hand.
-  const [inviteCode] = useState<string | null>(
-    () => new URLSearchParams(window.location.search).get("invite"),
-  );
-
   function goToGame(id: string) {
     window.history.pushState({}, "", `/?game=${encodeURIComponent(id)}`);
     setGameLinkID(id);
@@ -47,11 +41,7 @@ export function App() {
             Sign out
           </button>
         </span>
-      ) : (
-        <span className="status">
-          <i /> Server authoritative
-        </span>
-      )}
+      ) : null}
     </nav>
   );
 
@@ -72,11 +62,11 @@ export function App() {
               </h1>
               <p className="intro">
                 The board stays honest. The clock keeps running. Limited powers let you ask for
-                insight at exactly the right moment.
+                insight at the right moment which may or may not help you improve at chess.
               </p>
             </div>
             <div className="glass-card">
-              <AuthPanel initialInviteCode={inviteCode} />
+              <AuthPanel />
             </div>
           </section>
         </div>

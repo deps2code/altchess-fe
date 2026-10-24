@@ -100,7 +100,7 @@ h2 { margin: .75rem 0; font-family: Georgia, serif; font-size: clamp(2rem, 4vw, 
 
 .hero.photo { position: relative; z-index: 1; display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(20rem, .9fr); align-items: stretch; gap: 5vw; min-height: calc(100vh - 5rem); padding: 2rem 5vw clamp(3rem, 7vw, 5rem); }
 .hero-copy { align-self: center; }
-.hero-copy h1 { margin: 1rem 0 1.5rem; }
+.hero-copy h1 { margin: 1rem 0 1.5rem; font-size: clamp(2.8rem, 6.5vw, 6rem); }
 .hero-copy h1 span { color: var(--terracotta); }
 .hero-copy .intro { margin-bottom: 0; }
 
@@ -129,6 +129,17 @@ input:focus-visible, select:focus-visible, button:focus-visible, .choice:focus-v
 fieldset { margin: 0 0 1.25rem; padding: 0; border: 0; }
 .hint { margin: .6rem 0 0; color: var(--ink-3); font-size: .82rem; line-height: 1.5; }
 form .error { margin: 1.25rem 0 0; font-size: .88rem; }
+input[aria-invalid="true"] { border-color: var(--danger); }
+.sr-only { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+.rules { margin: .7rem 0 0; padding: 0; list-style: none; display: grid; gap: .4rem; font-size: .82rem; line-height: 1.4; color: var(--ink-3); }
+.rules li { display: flex; align-items: center; gap: .55rem; }
+.rules li[data-state="met"] { color: var(--win); }
+.rules li[data-state="unmet"] { color: var(--danger); }
+.rule-mark { display: inline-flex; flex: none; align-items: center; justify-content: center; width: 1.05rem; height: 1.05rem; border: 1.5px solid var(--line-strong); border-radius: 50%; }
+.rule-mark svg { width: .65rem; height: .65rem; stroke-width: 3; }
+.rules li[data-state="met"] .rule-mark { border-color: var(--win); color: var(--cream); background: var(--win); }
+.rules li[data-state="unmet"] .rule-mark { border-color: var(--danger); color: var(--cream); background: var(--danger); }
+.rules.server-error { margin-top: 1.25rem; padding: .8rem .9rem; border: 1px solid var(--danger); background: var(--danger-tint); font-size: .88rem; }
 button[disabled] { opacity: .55; cursor: progress; }
 button.ghost { margin: 0; padding: .5rem .8rem; border: 1px solid var(--line-strong); color: var(--ink); background: none; font-size: .72rem; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; }
 button.ghost:hover { border-color: var(--terracotta); background: none; color: var(--terracotta); }

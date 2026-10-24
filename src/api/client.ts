@@ -88,7 +88,6 @@ export type Registration = {
   email: string;
   password: string;
   display_name?: string;
-  invite_code?: string;
 };
 
 export type Seek = {
